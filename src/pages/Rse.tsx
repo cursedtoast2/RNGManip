@@ -641,8 +641,8 @@ function TargetPage({ hunt, encounter, initialSeed, trainerId, secretId, ready, 
             <button type="button" className={`target-row rse-row ${rowClasses} ${selectedKey === targetKey(target) ? "selected" : ""}`} aria-pressed={selectedKey === targetKey(target)} key={targetKey(target)} onClick={() => setSelectedTarget(target)}>
               <span className="row-radio">{selectedKey === targetKey(target) && <Check />}</span>
               <RowCell label="Advance"><b>{target.advance.toLocaleString()}</b></RowCell>
-              <RowCell label="Wait from boot"><b className="mono">{formatDuration(targetWaitMs(target, encounter))}</b></RowCell>
-              <RowCell label="PID"><b className="mono">{target.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell>
+              <RowCell label="Wait from boot"><b>{formatDuration(targetWaitMs(target, encounter))}</b></RowCell>
+              <RowCell label="PID"><b>{target.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell>
               <RowCell label="Nature"><b>{target.nature}</b></RowCell>
               {!genderless && <RowCell label="Gender"><b>{target.gender}</b></RowCell>}
               <IvSpread ivs={target.ivs} />
@@ -980,7 +980,7 @@ function ResultEntry({ encounter, target, initialSeed, trainerId, secretId, cali
               <button type="button" className={`hit-row rse-hit-row ${rowClasses} ${manuallySelected ? "selected" : ""}`} aria-pressed={selected} onClick={() => setSelectedHitKey(matchKey)}>
                 <span className={`row-radio ${selected ? "chosen" : ""}`}>{selected ? <Check /> : matchIndex + 1}</span>
                 <RowCell label="Advance"><b>{match.advance.toLocaleString()}</b></RowCell>
-                <RowCell label="PID"><b className="mono">{match.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell>
+                <RowCell label="PID"><b>{match.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell>
                 <RowCell label="Nature"><b>{match.nature}</b></RowCell>
                 {!genderless && <RowCell label="Gender"><b>{match.gender}</b></RowCell>}
                 <IvSpread ivs={match.ivs} />
