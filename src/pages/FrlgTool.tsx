@@ -751,7 +751,7 @@ function TargetPage({
               <span className="row-radio">{selectedKey === targetKey(target) && <Check />}</span>
               <RowCell label="Initial seed"><b>{target.seed}</b></RowCell>
               <RowCell label="Advance"><b>{target.advance.toLocaleString()}</b></RowCell>
-              {switchConsole && <RowCell label="Continue screen frames"><b>{target.continueFrames.toLocaleString()}</b></RowCell>}
+              {switchConsole && <RowCell label="Continue frames"><b>{target.continueFrames.toLocaleString()}</b></RowCell>}
               <RowCell label="PID"><b>{target.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell>
               <RowCell label="Nature"><b>{target.nature}</b></RowCell>
               {!genderless && <RowCell label="Gender"><b>{target.gender}</b></RowCell>}
@@ -1259,7 +1259,7 @@ export function ResultEntry({
             const selected = matches.length === 1 || selectedPossibleHitKey === matchKey;
             const manuallySelected = matches.length > 1 && selectedPossibleHitKey === matchKey;
             return <Fragment key={matchKey}>
-              <button type="button" className={`hit-row ${rowClasses} ${manuallySelected ? "selected" : ""}`} aria-pressed={selected} onClick={() => setSelectedPossibleHitKey(matchKey)}><span className={`row-radio ${selected ? "chosen" : ""}`}>{selected ? <Check /> : matchIndex + 1}</span><RowCell label="Seed"><b>{match.seed}</b></RowCell><RowCell label="Advance"><b>{match.advance.toLocaleString()}</b></RowCell>{switchConsole && <RowCell label="Continue screen frames"><b>{match.continueFrames.toLocaleString()}</b></RowCell>}<RowCell label="PID"><b>{match.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell><RowCell label="Nature"><b>{match.nature}</b></RowCell>{!genderless && <RowCell label="Gender"><b>{match.gender}</b></RowCell>}<IvSpread ivs={match.ivs} /></button>
+              <button type="button" className={`hit-row ${rowClasses} ${manuallySelected ? "selected" : ""}`} aria-pressed={selected} onClick={() => setSelectedPossibleHitKey(matchKey)}><span className={`row-radio ${selected ? "chosen" : ""}`}>{selected ? <Check /> : matchIndex + 1}</span><RowCell label="Seed"><b>{match.seed}</b></RowCell><RowCell label="Advance"><b>{match.advance.toLocaleString()}</b></RowCell>{switchConsole && <RowCell label="Continue frames"><b>{match.continueFrames.toLocaleString()}</b></RowCell>}<RowCell label="PID"><b>{match.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell><RowCell label="Nature"><b>{match.nature}</b></RowCell>{!genderless && <RowCell label="Gender"><b>{match.gender}</b></RowCell>}<IvSpread ivs={match.ivs} /></button>
               {selected && <div className="hit-calibration">
                 <div className="hit-calibration-values">
                   <span>Calibration</span>
