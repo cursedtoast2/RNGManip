@@ -213,6 +213,7 @@ svg { width: 18px; height: 18px; }
 .target-table-head { position: sticky; top: 0; z-index: 1; height: 38px; padding: 0 14px; color: var(--subtle); background: #22232c; font-size: 12px; font-weight: 600; }
 .target-table-body { min-height: 0; }
 .target-row { width: 100%; min-height: 62px; border: 0; border-top: 1px solid var(--line); padding: 8px 14px; text-align: left; background: transparent; cursor: pointer; }
+.target-row, .hit-row { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .target-row:first-child { border-top: 0; }
 @media (hover: hover) and (pointer: fine) { .target-row:hover { background: var(--surface-2); } }
 .target-row.selected { background: var(--purple-dark); box-shadow: inset 3px 0 var(--purple); }

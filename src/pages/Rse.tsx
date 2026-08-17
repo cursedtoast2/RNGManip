@@ -599,7 +599,6 @@ function TargetPage({ hunt, encounter, initialSeed, trainerId, secretId, ready, 
       <header className="screen-heading">
         <div>
           <h1>Choose your shiny {encounter.species}</h1>
-          <p>Level {encounter.level} · {visibleTargets.length} available in this search</p>
         </div>
       </header>
 

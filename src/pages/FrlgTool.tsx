@@ -720,7 +720,7 @@ function TargetPage({
   return (
     <section className="target-screen">
       <div className="target-scroll-area">
-      <header className="screen-heading"><div><h1>Choose your shiny {encounter.species}</h1><p>{seedLoading ? "Loading targets…" : `Level ${encounter.level} · ${visibleTargets.length} available in this search`}</p></div></header>
+      <header className="screen-heading"><div><h1>Choose your shiny {encounter.species}</h1></div></header>
 
       <div className="target-control-area"><div className={`target-tools ${filtersOpen ? "filters-open" : ""}`}>
         <label><span>Encounter</span><select aria-label="Encounter" value={encounter.id} onChange={(event) => setEncounterId(event.target.value)}>{groupedEncounters(hunt.game).map((group) => <optgroup key={group.group} label={group.group}>{group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species} · Lv {option.level}</option>)}</optgroup>)}</select></label>
