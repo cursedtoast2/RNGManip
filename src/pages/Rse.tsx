@@ -38,7 +38,7 @@ import {
   type RseIdState,
 } from "../engine/rseSid";
 import { isRseGenderless } from "../engine/rseSpecies";
-import { CUE_STYLES, PRACTICE_COUNTDOWN_MS, type CueStyle } from "../engine/timer";
+import { PRACTICE_COUNTDOWN_MS, type CueStyle } from "../engine/timer";
 
 type Stage = "setup" | "target" | "attempt" | "result";
 
@@ -83,7 +83,6 @@ type PersistedState = {
   targetSearch: TargetSearchSettings;
   selectedTarget: RseTarget | null;
   calibrationMs: number;
-  cueStyle: CueStyle;
   observedNature: string;
   recentHits: HitObservation[];
   attempts: number;
@@ -147,7 +146,6 @@ function freshState(): PersistedState {
     targetSearch: { ...DEFAULT_TARGET_SEARCH },
     selectedTarget: null,
     calibrationMs: 0,
-    cueStyle: "standard",
     observedNature: NATURES[0],
     recentHits: [],
     attempts: 0,
@@ -197,7 +195,6 @@ function loadPersistedState(): PersistedState {
       targetSearch,
       selectedTarget,
       calibrationMs: Number.isFinite(saved.calibrationMs) ? Math.round(saved.calibrationMs!) : 0,
-      cueStyle: saved.cueStyle !== undefined && (CUE_STYLES as readonly string[]).includes(saved.cueStyle) ? saved.cueStyle : fallback.cueStyle,
       observedNature: typeof saved.observedNature === "string" && (NATURES as readonly string[]).includes(saved.observedNature) ? saved.observedNature : fallback.observedNature,
       recentHits: Array.isArray(saved.recentHits) ? saved.recentHits.filter((hit) => Number.isFinite(hit?.advanceDelta)).slice(-8) : [],
       attempts: Number.isInteger(saved.attempts) && saved.attempts! >= 0 ? saved.attempts! : 0,
@@ -209,7 +206,7 @@ function loadPersistedState(): PersistedState {
   }
 }
 
-export default function Rse() {
+export default function Rse({ cueStyle, onCueStyleChange }: { cueStyle: CueStyle; onCueStyleChange: (cueStyle: CueStyle) => void }) {
   const restored = useMemo(loadPersistedState, []);
   const precisionAudio = useRef<PrecisionAudioState>(createPrecisionAudioState());
   const [stage, setStage] = useState<Stage>(restored.stage);
@@ -217,7 +214,6 @@ export default function Rse() {
   const [targetSearch, setTargetSearch] = useState<TargetSearchSettings>(restored.targetSearch);
   const [selectedTarget, setSelectedTarget] = useState<RseTarget | null>(restored.selectedTarget);
   const [calibrationMs, setCalibrationMs] = useState(restored.calibrationMs);
-  const [cueStyle, setCueStyle] = useState<CueStyle>(restored.cueStyle);
   const [observedNature, setObservedNature] = useState(restored.observedNature);
   const [recentHits, setRecentHits] = useState<HitObservation[]>(restored.recentHits);
   const [attempts, setAttempts] = useState(restored.attempts);
@@ -249,11 +245,11 @@ export default function Rse() {
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        stage, hunt, targetSearch, selectedTarget, calibrationMs, cueStyle, observedNature, recentHits, attempts, recording, resultVersion,
+        stage, hunt, targetSearch, selectedTarget, calibrationMs, observedNature, recentHits, attempts, recording, resultVersion,
       } satisfies PersistedState));
     } catch {
     }
-  }, [attempts, calibrationMs, cueStyle, hunt, observedNature, recentHits, recording, resultVersion, selectedTarget, stage, targetSearch]);
+  }, [attempts, calibrationMs, hunt, observedNature, recentHits, recording, resultVersion, selectedTarget, stage, targetSearch]);
 
   const moveTo = (next: Stage) => setStage(next);
   const setupComplete = trainerIdValid && secretIdValid && initialSeed !== null;
@@ -336,7 +332,7 @@ export default function Rse() {
             focusRequest={timerFocusRequest}
             resultFocusRequest={resultFocusRequest}
             cueStyle={cueStyle}
-            onCueStyleChange={setCueStyle}
+            onCueStyleChange={onCueStyleChange}
             audioState={precisionAudio.current}
             onTimerFinished={() => { moveTo("result"); setResultFocusRequest((request) => request + 1); }}
             onResultConfirmed={() => { moveTo("attempt"); setTimerFocusRequest((request) => request + 1); }}

@@ -29,7 +29,6 @@ import {
 import { isGenderless } from "../engine/species";
 import { loadSeedData } from "../engine/seedData";
 import {
-  CUE_STYLES,
   PRACTICE_COUNTDOWN_MS,
   type CueStyle,
 } from "../engine/timer";
@@ -92,7 +91,6 @@ type PersistedState = {
   selectedTarget: TargetOption | null;
   sidIndex: number;
   calibration: Calibration;
-  cueStyle: CueStyle;
   observedNature: string;
   recentHits: HitObservation[];
   attempts: number;
@@ -167,7 +165,6 @@ function freshState(): PersistedState {
     selectedTarget: null,
     sidIndex: 0,
     calibration: { seed: 0, continueMs: 0 },
-    cueStyle: "standard",
     observedNature: NATURES[0],
     recentHits: [],
     attempts: 0,
@@ -223,7 +220,6 @@ function loadPersistedState(): PersistedState {
         seed: Number.isFinite(savedCalibration?.seed) ? savedCalibration!.seed! : 0,
         continueMs: Number.isFinite(savedCalibration?.continueMs) ? savedCalibration!.continueMs! : migratedContinueMs,
       },
-      cueStyle: saved.cueStyle !== undefined && (CUE_STYLES as readonly string[]).includes(saved.cueStyle) ? saved.cueStyle : fallback.cueStyle,
       observedNature: typeof saved.observedNature === "string" && (NATURES as readonly string[]).includes(saved.observedNature) ? saved.observedNature : fallback.observedNature,
       recentHits: Array.isArray(saved.recentHits) ? saved.recentHits.filter((hit) => Number.isFinite(hit?.openingDelta) && Number.isFinite(hit?.continueDelta)).slice(-8) : [],
       attempts: Number.isInteger(saved.attempts) && saved.attempts! >= 0 ? saved.attempts! : 0,
@@ -235,7 +231,7 @@ function loadPersistedState(): PersistedState {
   }
 }
 
-function FrlgTool() {
+function FrlgTool({ cueStyle, onCueStyleChange }: { cueStyle: CueStyle; onCueStyleChange: (cueStyle: CueStyle) => void }) {
   const restored = useMemo(loadPersistedState, []);
   const precisionAudio = useRef<PrecisionAudioState>(createPrecisionAudioState());
   const [stage, setStage] = useState<Stage>(restored.stage);
@@ -244,7 +240,6 @@ function FrlgTool() {
   const [selectedTarget, setSelectedTarget] = useState<TargetOption | null>(restored.selectedTarget);
   const [sidIndex, setSidIndex] = useState(restored.sidIndex);
   const [calibration, setCalibration] = useState<Calibration>(restored.calibration);
-  const [cueStyle, setCueStyle] = useState<CueStyle>(restored.cueStyle);
   const [observedNature, setObservedNature] = useState(restored.observedNature);
   const [recentHits, setRecentHits] = useState<HitObservation[]>(restored.recentHits);
   const [attempts, setAttempts] = useState(restored.attempts);
@@ -284,10 +279,10 @@ function FrlgTool() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ stage, hunt, targetSearch, selectedTarget, sidIndex, calibration, cueStyle, observedNature, recentHits, attempts, recording, resultVersion } satisfies PersistedState));
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ stage, hunt, targetSearch, selectedTarget, sidIndex, calibration, observedNature, recentHits, attempts, recording, resultVersion } satisfies PersistedState));
     } catch {
     }
-  }, [attempts, calibration, cueStyle, hunt, observedNature, recentHits, recording, resultVersion, selectedTarget, sidIndex, stage, targetSearch]);
+  }, [attempts, calibration, hunt, observedNature, recentHits, recording, resultVersion, selectedTarget, sidIndex, stage, targetSearch]);
 
   useEffect(() => {
     if (!trainerIdValid || stage === "setup") return;
@@ -340,7 +335,7 @@ function FrlgTool() {
               }}
               trainerIdValid={trainerIdValid}
               cueStyle={cueStyle}
-              onCueStyleChange={setCueStyle}
+              onCueStyleChange={onCueStyleChange}
               audioState={precisionAudio.current}
               onContinue={() => moveTo("target")}
             />
@@ -392,7 +387,7 @@ function FrlgTool() {
               focusRequest={timerFocusRequest}
               resultFocusRequest={resultFocusRequest}
               cueStyle={cueStyle}
-              onCueStyleChange={setCueStyle}
+              onCueStyleChange={onCueStyleChange}
               audioState={precisionAudio.current}
               timersActive
               onTimerFinished={() => { moveTo("result"); setResultFocusRequest((request) => request + 1); }}

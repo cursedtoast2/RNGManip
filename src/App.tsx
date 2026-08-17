@@ -5,9 +5,33 @@ import FrlgTool from "./pages/FrlgTool";
 import Landing from "./pages/Landing";
 import Rse from "./pages/Rse";
 import { routeHref, useRoute } from "./routing";
+import { CUE_STYLES, type CueStyle } from "./engine/timer";
 
 const SIDEBAR_STORAGE_KEY = "rngmanip-sidebar-collapsed-v1";
+const CUE_STYLE_STORAGE_KEY = "rngmanip-cue-style-v1";
+const FRLG_STORAGE_KEY = "rngmanip-hunt-v3";
+const RSE_STORAGE_KEY = "rngmanip-rse-hunt-v1";
 const PHONE_QUERY = "(max-width: 760px)";
+
+function validCueStyle(value: unknown): value is CueStyle {
+  return typeof value === "string" && (CUE_STYLES as readonly string[]).includes(value);
+}
+
+function loadCueStyle(route: string): CueStyle {
+  try {
+    const globalValue = window.localStorage.getItem(CUE_STYLE_STORAGE_KEY);
+    if (validCueStyle(globalValue)) return globalValue;
+    const legacyKeys = route === "/rse" ? [RSE_STORAGE_KEY, FRLG_STORAGE_KEY] : [FRLG_STORAGE_KEY, RSE_STORAGE_KEY];
+    for (const key of legacyKeys) {
+      const value = window.localStorage.getItem(key);
+      if (!value) continue;
+      const legacyValue = (JSON.parse(value) as { cueStyle?: unknown }).cueStyle;
+      if (validCueStyle(legacyValue)) return legacyValue;
+    }
+  } catch {
+  }
+  return "standard";
+}
 
 function phoneMediaQuery(): MediaQueryList | null {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null;
@@ -32,11 +56,19 @@ function App() {
   const [phone, setPhone] = useState(isPhoneWidth);
   const [desktopCollapsed, setDesktopCollapsed] = useState(loadDesktopCollapsed);
   const [phoneDrawerOpen, setPhoneDrawerOpen] = useState(false);
+  const [cueStyle, setCueStyle] = useState<CueStyle>(() => loadCueStyle(route));
   const collapsed = phone ? !phoneDrawerOpen : desktopCollapsed;
 
   useEffect(() => {
     document.documentElement.dataset.theme = "dark";
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CUE_STYLE_STORAGE_KEY, cueStyle);
+    } catch {
+    }
+  }, [cueStyle]);
 
   useEffect(() => {
     const query = phoneMediaQuery();
@@ -98,7 +130,7 @@ function App() {
           <a className="site-brand" href={routeHref("/")}>RNG<span>Manip</span></a>
         </header>
         <main className="site-main">
-          {route === "/frlg" ? <FrlgTool /> : route === "/rse" ? <Rse /> : <Landing />}
+          {route === "/frlg" ? <FrlgTool cueStyle={cueStyle} onCueStyleChange={setCueStyle} /> : route === "/rse" ? <Rse cueStyle={cueStyle} onCueStyleChange={setCueStyle} /> : <Landing />}
         </main>
       </div>
     </div>
