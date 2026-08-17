@@ -1,5 +1,5 @@
-import { Gamepad2, Play, Settings2, Square, Target } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from "react";
+import { ChevronDown, Gamepad2, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   ACTION_CUE_DURATION_MS,
@@ -330,30 +330,6 @@ export function CueStyleSelector({ value, disabled = false, label, onChange }: {
   );
 }
 
-export function TimerToggleButton({ buttonRef, running, label, icon, disabled = false, onPointerDown, onKeyDown, onClick }: {
-  buttonRef?: RefObject<HTMLButtonElement | null>;
-  running: boolean;
-  label: string;
-  icon?: ReactNode;
-  disabled?: boolean;
-  onPointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
-  onKeyDown?: (event: ReactKeyboardEvent<HTMLButtonElement>) => void;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      ref={buttonRef}
-      type="button"
-      className={`timer-toggle ${running ? "stop" : ""}`}
-      aria-label={label}
-      disabled={disabled}
-      onPointerDown={onPointerDown}
-      onKeyDown={onKeyDown}
-      onClick={onClick}
-    >{icon ?? (running ? <Square fill="currentColor" /> : <Play fill="currentColor" />)}<span className="timer-toggle-label">{label}</span></button>
-  );
-}
-
 export type TimerPhase = { label: string; ms: number };
 export type PracticeFeedback = { phase: number; deltaMs: number; judgment: PracticeJudgment };
 
@@ -377,6 +353,7 @@ function PracticeSupport({ history, targetFrameMs }: {
   history: PracticeFeedback[];
   targetFrameMs: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const latest = history.at(-1) ?? null;
   const frameOffset = latest ? getPracticeFrameOffset(latest.deltaMs, targetFrameMs) : null;
   const deltas = history.map((feedback) => feedback.deltaMs);
@@ -385,15 +362,20 @@ function PracticeSupport({ history, targetFrameMs }: {
   const successCount = history.filter((feedback) => feedback.judgment === "target").length;
 
   return (
-    <div className="practice-support">
-      <div className={`practice-frame-details ${latest ? `practice-${latest.judgment}` : ""}`} aria-live="polite">
+    <div className={`practice-support ${expanded ? "expanded" : ""}`} data-timer-control>
+      <button type="button" className="practice-stats-toggle" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>Practice stats<ChevronDown aria-hidden="true" /></button>
+      {expanded && <div className={`practice-frame-details ${latest ? `practice-${latest.judgment}` : ""}`} aria-live="polite">
         <span><small>Last frame</small><b>{frameOffset === null ? "—" : frameOffset === 0 ? "Target (0)" : formatSignedNumber(frameOffset)}</b></span>
         <span><small>Median</small><b>{medianMs === null ? "—" : formatPracticeBias(medianMs)}</b></span>
         <span><small>Streak</small><b>{streaks.current} · best {streaks.best}</b></span>
         <span><small>Exact</small><b>{successCount}/{history.length}</b></span>
-      </div>
+      </div>}
     </div>
   );
+}
+
+function isTimerControl(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest("button, input, select, textarea, a, [data-timer-control]") !== null;
 }
 
 export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, focusRequest, practiceMode, onPracticeModeChange, cueStyle, onCueStyleChange, showHuntCueStyle = false, audioState, onStarted, onFinished }: {
@@ -424,7 +406,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   const [practiceHistory, setPracticeHistory] = useState<PracticeFeedback[]>([]);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const timerWorker = useRef<Worker | null>(null);
-  const toggleButton = useRef<HTMLButtonElement | null>(null);
+  const timerSurface = useRef<HTMLDivElement | null>(null);
   const options = useRef<HTMLDivElement | null>(null);
   const finishTimeout = useRef<number | null>(null);
   const onStartedRef = useRef(onStarted);
@@ -433,7 +415,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   const commandToken = useRef(0);
   const phaseDeadlines = useRef<number[]>([]);
   const practiceRestartAllowedAt = useRef(0);
-  const suppressToggleClick = useRef(false);
+  const suppressSurfaceClick = useRef(false);
   const wakeLock = useRef<ScreenWakeLock>(createScreenWakeLock());
   const activePhases = useRef<number[]>(runPhases);
   const practiceModeRef = useRef(practiceMode);
@@ -442,7 +424,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   useEffect(() => { onStartedRef.current = onStarted; }, [onStarted]);
   useEffect(() => { onFinishedRef.current = onFinished; }, [onFinished]);
   useEffect(() => {
-    if (active) toggleButton.current?.focus({ preventScroll: true });
+    if (active) timerSurface.current?.focus({ preventScroll: true });
   }, [active, focusRequest, practiceMode]);
   useEffect(() => {
     if (!runningRef.current) setRemaining(phases[0]);
@@ -618,7 +600,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
     const handleSpace = (event: KeyboardEvent) => {
       if (!active || event.code !== "Space" || event.repeat) return;
       const element = event.target as HTMLElement | null;
-      if (element?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "A"].includes(element?.tagName ?? "") || (element?.tagName === "BUTTON" && element !== toggleButton.current)) return;
+      if (element?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "A", "BUTTON"].includes(element?.tagName ?? "")) return;
       event.preventDefault();
       if (runningRef.current && practiceMode) recordPracticePress(getInputEventAbsoluteTime(event));
       else if (runningRef.current) stop();
@@ -645,9 +627,9 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   const display = showPracticeJudgment
     ? formatPracticeFeedback(practiceFeedback)
     : showMissedPractice ? "No press recorded" : formatDuration(remaining);
-  const toggleLabel = running
-    ? practiceMode ? "Record practice press" : "Stop timer"
-    : practiceMode ? "Start practice" : "Start timer";
+  const surfaceHint = running
+    ? practiceMode ? "Click or tap anywhere to record" : "Click or tap anywhere to stop"
+    : "Click or tap anywhere to start";
   const selectMode = (nextPracticeMode: boolean) => {
     if (nextPracticeMode === practiceMode) return;
     setOptionsOpen(false);
@@ -655,9 +637,9 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
     practiceRestartAllowedAt.current = 0;
     onPracticeModeChange(nextPracticeMode);
   };
-  const handleToggleClick = () => {
-    if (suppressToggleClick.current) {
-      suppressToggleClick.current = false;
+  const handleSurfaceClick = () => {
+    if (suppressSurfaceClick.current) {
+      suppressSurfaceClick.current = false;
       return;
     }
     if (runningRef.current && practiceMode) recordPracticePress(performance.timeOrigin + performance.now());
@@ -666,8 +648,24 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   };
 
   return (
-    <div className={`guided-timer ${running ? "running" : ""} ${practiceMode ? "practice" : ""}`}>
-      <div className="timer-toolbar">
+    <div
+      ref={timerSurface}
+      className={`guided-timer ${running ? "running" : ""} ${practiceMode ? "practice" : ""}`}
+      tabIndex={-1}
+      onPointerDown={(event) => {
+        if (isTimerControl(event.target) || !runningRef.current || !practiceMode) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        suppressSurfaceClick.current = true;
+        window.setTimeout(() => { suppressSurfaceClick.current = false; }, 750);
+        recordPracticePress(getInputEventAbsoluteTime(event.nativeEvent));
+      }}
+      onClick={(event) => {
+        if (isTimerControl(event.target)) return;
+        handleSurfaceClick();
+      }}
+    >
+      <div className="timer-toolbar" data-timer-control>
         <div className="timer-mode-switch" role="group" aria-label="Timer mode">
           <button type="button" className={!practiceMode ? "active" : ""} aria-pressed={!practiceMode} disabled={running} onClick={() => selectMode(false)}>Hunt timer</button>
           <button type="button" className={practiceMode ? "active" : ""} aria-pressed={practiceMode} disabled={running} onClick={() => selectMode(true)}>Practice timer</button>
@@ -685,26 +683,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
         <div className={`timer-numbers ${showPracticeJudgment ? `practice-${practiceFeedback.judgment}` : showMissedPractice ? "practice-missed" : ""}`} aria-live="polite">{display}</div>
         <div className="timer-beats" aria-label="Action timer beat"><span className={`${beepStep >= 6 ? "heard" : ""} action-beat`}>Press</span></div>
       </div>
-      <TimerToggleButton
-        buttonRef={toggleButton}
-        running={running}
-        label={toggleLabel}
-        icon={running && practiceMode ? <Target /> : undefined}
-        onPointerDown={(event) => {
-          if (!runningRef.current || !practiceMode) return;
-          event.preventDefault();
-          event.currentTarget.setPointerCapture(event.pointerId);
-          suppressToggleClick.current = true;
-          window.setTimeout(() => { suppressToggleClick.current = false; }, 750);
-          recordPracticePress(getInputEventAbsoluteTime(event.nativeEvent));
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" || !runningRef.current || !practiceMode) return;
-          event.preventDefault();
-          recordPracticePress(getInputEventAbsoluteTime(event.nativeEvent));
-        }}
-        onClick={handleToggleClick}
-      />
+      <div className="timer-surface-hint">{surfaceHint}</div>
       {practiceMode && <PracticeSupport history={practiceHistory} targetFrameMs={targetFrameMs} />}
       <TimerInputLegend />
     </div>
