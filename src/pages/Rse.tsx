@@ -609,7 +609,7 @@ function TargetPage({ hunt, encounter, initialSeed, trainerId, secretId, ready, 
             <select aria-label="Encounter" value={encounter.id} onChange={(event) => setEncounterId(event.target.value)}>
               {groupedRseEncounters(hunt.version).map((group) => (
                 <optgroup key={group.group} label={group.group}>
-                  {group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species} · Lv {option.level} · {option.location}</option>)}
+                  {group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species} · Lv {option.level}</option>)}
                 </optgroup>
               ))}
             </select>
