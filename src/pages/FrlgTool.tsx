@@ -724,6 +724,7 @@ function TargetPage({
 
       <div className="target-control-area"><div className={`target-tools ${filtersOpen ? "filters-open" : ""}`}>
         <label><span>Encounter</span><select aria-label="Encounter" value={encounter.id} onChange={(event) => setEncounterId(event.target.value)}>{groupedEncounters(hunt.game).map((group) => <optgroup key={group.group} label={group.group}>{group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species}</option>)}</optgroup>)}</select></label>
+        <label><span>Target seed</span><select value={Math.max(0, Math.min(seeds.length - 1, centerIndex))} disabled={seeds.length === 0} onChange={(event) => { updateSearchSettings({ centerSeed: seeds[Number(event.target.value)] ?? null }); setSelectedTarget(null); }}>{seeds.map((seed, seedIndex) => <option key={`${seed.initialSeed}-${seedIndex}`} value={seedIndex}>{seed.initialSeed.toString(16).toUpperCase().padStart(4, "0")}</option>)}</select></label>
 
         <button type="button" className={`target-filters-toggle ${filtersOpen ? "active" : ""}`} aria-expanded={filtersOpen} aria-controls="target-filter-fields" onClick={() => setFiltersOpen((open) => !open)}>Filters</button>
         <div className="target-filter-fields" id="target-filter-fields">
@@ -735,7 +736,6 @@ function TargetPage({
       </div>
 
       {showSearch && <div className="target-search-controls">
-        <label><span>Center seed</span><select value={Math.max(0, Math.min(seeds.length - 1, centerIndex))} disabled={seeds.length === 0} onChange={(event) => { updateSearchSettings({ centerSeed: seeds[Number(event.target.value)] ?? null }); setSelectedTarget(null); }}>{seeds.map((seed, seedIndex) => <option key={`${seed.initialSeed}-${seedIndex}`} value={seedIndex}>{seed.initialSeed.toString(16).toUpperCase().padStart(4, "0")}</option>)}</select></label>
         <RangeNumberInput label="Seeds ±" value={seedRadius} min={0} max={200} onCommit={(value) => { updateSearchSettings({ seedRadius: value }); setSelectedTarget(null); }} />
         <RangeNumberInput label="First advance" value={minAdvances} min={0} max={100000} onCommit={(value) => { updateSearchSettings({ minAdvances: value }); setSelectedTarget(null); }} />
         <RangeNumberInput label="Last advance" value={maxAdvances} min={0} max={100000} onCommit={(value) => { updateSearchSettings({ maxAdvances: value }); setSelectedTarget(null); }} />

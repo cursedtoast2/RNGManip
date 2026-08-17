@@ -204,7 +204,7 @@ svg { width: 18px; height: 18px; }
 .range-toggle { height: 36px; border: 1px solid var(--line); border-radius: 7px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: var(--muted); background: transparent; cursor: pointer; }
 .range-toggle.active { color: var(--text); border-color: var(--purple); }
 @media (hover: hover) and (pointer: fine) { .range-toggle:hover { color: var(--text); border-color: var(--purple); } }
-.target-search-controls { padding: 10px; border: 1px solid var(--line); border-bottom: 0; display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); gap: 10px; background: var(--surface); overscroll-behavior: contain; }
+.target-search-controls { padding: 10px; border: 1px solid var(--line); border-bottom: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; background: var(--surface); overscroll-behavior: contain; }
 .target-table { min-height: 0; border-top: 1px solid var(--line); overflow: auto; overscroll-behavior: contain; }
 .target-table-head, .target-row { min-width: 1080px; display: grid; grid-template-columns: 36px 76px 88px 150px 118px 112px 82px minmax(350px, 1fr); align-items: center; gap: 12px; }
 .target-table-head.retail, .target-row.retail { min-width: 920px; grid-template-columns: 36px 76px 88px 118px 112px 82px minmax(350px, 1fr); }
@@ -384,7 +384,7 @@ svg { width: 18px; height: 18px; }
   .screen-heading { min-height: 64px; }
   .screen-heading h1 { font-size: 23px; }
   .target-tools { min-height: 54px; }
-  .target-search-controls { grid-template-columns: repeat(5, 150px); overflow-x: auto; }
+  .target-search-controls { grid-template-columns: repeat(4, 150px); overflow-x: auto; }
   .timer-numbers { font-size: 40px; }
   .timer-beats { min-height: 90px; margin-top: 22px; gap: 8px; }
   .timer-beats span { width: 58px; height: 58px; font-size: 17px; }
