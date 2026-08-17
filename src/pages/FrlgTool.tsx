@@ -719,7 +719,8 @@ function TargetPage({
 
   return (
     <section className="target-screen">
-      <header className="screen-heading"><div><h1>Choose your shiny {encounter.species}</h1><p>{seedLoading ? "Loading targets…" : `Level ${encounter.level} · ${encounter.location} · ${visibleTargets.length} available in this search`}</p></div></header>
+      <div className="target-scroll-area">
+      <header className="screen-heading"><div><h1>Choose your shiny {encounter.species}</h1><p>{seedLoading ? "Loading targets…" : `Level ${encounter.level} · ${visibleTargets.length} available in this search`}</p></div></header>
 
       <div className="target-control-area"><div className={`target-tools ${filtersOpen ? "filters-open" : ""}`}>
         <label><span>Encounter</span><select aria-label="Encounter" value={encounter.id} onChange={(event) => setEncounterId(event.target.value)}>{groupedEncounters(hunt.game).map((group) => <optgroup key={group.group} label={group.group}>{group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species} · Lv {option.level}</option>)}</optgroup>)}</select></label>
@@ -760,6 +761,7 @@ function TargetPage({
           ))}
           {!seedLoading && !seedError && visibleTargets.length === 0 && <div className="table-empty">{targets.length > 0 ? "No targets match those filters." : "No targets in this range. Open Search range to widen it."}</div>}
         </div>
+      </div>
       </div>
       <WizardFooter canBack canNext={Boolean(selectedTarget)} onBack={onBack} onNext={onContinue} nextLabel="Use selected target" />
     </section>

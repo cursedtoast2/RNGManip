@@ -595,10 +595,11 @@ function TargetPage({ hunt, encounter, initialSeed, trainerId, secretId, ready, 
 
   return (
     <section className="target-screen">
+      <div className="target-scroll-area">
       <header className="screen-heading">
         <div>
           <h1>Choose your shiny {encounter.species}</h1>
-          <p>Level {encounter.level} · {encounter.location} · {visibleTargets.length} available in this search</p>
+          <p>Level {encounter.level} · {visibleTargets.length} available in this search</p>
         </div>
       </header>
 
@@ -650,6 +651,7 @@ function TargetPage({ hunt, encounter, initialSeed, trainerId, secretId, ready, 
           ))}
           {ready && visibleTargets.length === 0 && <div className="table-empty">{targets.length > 0 ? "No targets match those filters." : "No targets in this range. Open Search range to widen it."}</div>}
         </div>
+      </div>
       </div>
       <WizardFooter canBack canNext={Boolean(selectedTarget)} onBack={onBack} onNext={onContinue} nextLabel="Use selected target" />
     </section>
