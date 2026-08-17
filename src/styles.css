@@ -231,7 +231,7 @@ svg { width: 18px; height: 18px; }
 .iv-spread b { font-size: 13px; }
 
 .timer-screen { height: 100%; padding: 0 24px; display: grid; grid-template-rows: minmax(0, 1fr) 76px; }
-.guided-timer { height: 100%; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.guided-timer { height: 100%; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
 .guided-timer:focus { outline: none; }
 .timer-stage { min-width: 0; text-align: center; }
 .timer-toolbar { width: min(460px, calc(100% - 24px)); position: absolute; top: 22px; left: 50%; z-index: 4; transform: translateX(-50%); display: flex; align-items: stretch; gap: 8px; }
