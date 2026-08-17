@@ -723,7 +723,7 @@ function TargetPage({
       <header className="screen-heading"><div><h1>Choose your shiny {encounter.species}</h1></div></header>
 
       <div className="target-control-area"><div className={`target-tools ${filtersOpen ? "filters-open" : ""}`}>
-        <label><span>Encounter</span><select aria-label="Encounter" value={encounter.id} onChange={(event) => setEncounterId(event.target.value)}>{groupedEncounters(hunt.game).map((group) => <optgroup key={group.group} label={group.group}>{group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species} · Lv {option.level}</option>)}</optgroup>)}</select></label>
+        <label><span>Encounter</span><select aria-label="Encounter" value={encounter.id} onChange={(event) => setEncounterId(event.target.value)}>{groupedEncounters(hunt.game).map((group) => <optgroup key={group.group} label={group.group}>{group.encounters.map((option) => <option key={option.id} value={option.id}>{option.species}</option>)}</optgroup>)}</select></label>
 
         <button type="button" className={`target-filters-toggle ${filtersOpen ? "active" : ""}`} aria-expanded={filtersOpen} aria-controls="target-filter-fields" onClick={() => setFiltersOpen((open) => !open)}>Filters</button>
         <div className="target-filter-fields" id="target-filter-fields">
