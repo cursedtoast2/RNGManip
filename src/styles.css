@@ -233,7 +233,8 @@ svg { width: 18px; height: 18px; }
 .iv-spread b { font-size: 14px; }
 
 .timer-screen { height: 100%; padding: 0 24px; display: grid; grid-template-rows: minmax(0, 1fr) 76px; }
-.guided-timer { height: 100%; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.guided-timer { height: 100%; min-height: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.guided-timer.tap-anywhere { cursor: pointer; }
 .guided-timer:focus { outline: none; }
 .timer-stage { min-width: 0; text-align: center; }
 .timer-toolbar { width: min(460px, calc(100% - 24px)); position: absolute; top: 22px; left: 50%; z-index: 4; transform: translateX(-50%); display: flex; align-items: stretch; gap: 8px; }
@@ -243,6 +244,10 @@ svg { width: 18px; height: 18px; }
 .timer-mode-switch button:last-child { border-left: 0; border-radius: 0 8px 8px 0; }
 @media (hover: hover) and (pointer: fine) { .timer-mode-switch button:hover:not(:disabled) { color: var(--text); background: var(--surface-2); } }
 .timer-mode-switch button.active { z-index: 1; color: var(--text); border-color: var(--purple); background: var(--purple-dark); box-shadow: inset 0 0 0 1px var(--purple); }
+.timer-tap-toggle { width: 44px; min-height: 40px; flex: 0 0 auto; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); background: var(--surface); cursor: pointer; }
+.timer-tap-toggle svg { width: 17px; height: 17px; }
+.timer-tap-toggle.active { color: var(--text); border-color: var(--purple); background: var(--purple-dark); }
+@media (hover: hover) and (pointer: fine) { .timer-tap-toggle:hover:not(:disabled) { color: var(--text); background: var(--surface-2); } }
 .timer-options { flex: 0 0 auto; }
 .timer-options-trigger { height: 100%; min-height: 40px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 12px; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); background: var(--surface); font-size: 13px; font-weight: 700; cursor: pointer; }
 .timer-options-trigger[aria-expanded="true"] { color: var(--text); border-color: var(--purple); background: var(--purple-dark); }
@@ -349,7 +354,7 @@ svg { width: 18px; height: 18px; }
 @media (pointer: coarse) {
   select, input, textarea, .target-tools select, .target-search-controls select, .target-search-controls input { font-size: 16px; }
   .setup-nav button, .sid-timer-trigger, .setup-disclosure-toggle, .auto-apply-control { min-height: 44px; }
-  .setup-segments button, .cue-style-selector button, .timer-mode-switch button, .timer-options-trigger, .small-segments button, .remove-level, .add-level, .range-toggle, .target-filters-toggle, .adjustment-control > div > button, .adjustment-input-wrap input,
+  .setup-segments button, .cue-style-selector button, .timer-mode-switch button, .timer-options-trigger, .timer-tap-toggle, .small-segments button, .remove-level, .add-level, .range-toggle, .target-filters-toggle, .adjustment-control > div > button, .adjustment-input-wrap input,
   .setup-row-control > select, .setup-seed-options select, .setup-trainer-id-input, .setup-secret-id-field > input, .target-tools select, .target-search-controls select, .target-search-controls input,
   .result-inputs select, .result-inputs > label > input, .result-observation-row > label > input, .match-range input, .result-stats input { height: auto; min-height: 44px; }
   .auto-apply-control input { width: 22px; height: 22px; }

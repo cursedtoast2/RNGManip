@@ -1,5 +1,5 @@
-import { ChevronDown, Gamepad2, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Gamepad2, Settings2, Smartphone } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
 import {
   ACTION_CUE_DURATION_MS,
@@ -374,6 +374,47 @@ function PracticeSupport({ history, targetFrameMs }: {
   );
 }
 
+const TAP_ANYWHERE_STORAGE_KEY = "rngmanip-tap-anywhere-v1";
+const TAP_ANYWHERE_QUERY = "(pointer: coarse)";
+
+function loadTapAnywhere(): boolean {
+  try {
+    const stored = window.localStorage.getItem(TAP_ANYWHERE_STORAGE_KEY);
+    if (stored === "on") return true;
+    if (stored === "off") return false;
+  } catch {
+  }
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+  return window.matchMedia(TAP_ANYWHERE_QUERY).matches;
+}
+
+let tapAnywhereValue: boolean | null = null;
+const tapAnywhereListeners = new Set<() => void>();
+
+function getTapAnywhere(): boolean {
+  if (tapAnywhereValue === null) tapAnywhereValue = loadTapAnywhere();
+  return tapAnywhereValue;
+}
+
+function setTapAnywhere(value: boolean): void {
+  if (getTapAnywhere() === value) return;
+  tapAnywhereValue = value;
+  try {
+    window.localStorage.setItem(TAP_ANYWHERE_STORAGE_KEY, value ? "on" : "off");
+  } catch {
+  }
+  for (const listener of tapAnywhereListeners) listener();
+}
+
+function subscribeTapAnywhere(listener: () => void): () => void {
+  tapAnywhereListeners.add(listener);
+  return () => { tapAnywhereListeners.delete(listener); };
+}
+
+function useTapAnywhere(): boolean {
+  return useSyncExternalStore(subscribeTapAnywhere, getTapAnywhere, () => false);
+}
+
 function isTimerControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("button, input, select, textarea, a, [data-timer-control]") !== null;
 }
@@ -405,6 +446,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   const [practiceMissed, setPracticeMissed] = useState(false);
   const [practiceHistory, setPracticeHistory] = useState<PracticeFeedback[]>([]);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const tapAnywhere = useTapAnywhere();
   const timerWorker = useRef<Worker | null>(null);
   const timerSurface = useRef<HTMLDivElement | null>(null);
   const options = useRef<HTMLDivElement | null>(null);
@@ -627,9 +669,10 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   const display = showPracticeJudgment
     ? formatPracticeFeedback(practiceFeedback)
     : showMissedPractice ? "No press recorded" : formatDuration(remaining);
-  const surfaceHint = running
-    ? practiceMode ? "Click or tap anywhere to record" : "Click or tap anywhere to stop"
-    : "Click or tap anywhere to start";
+  const surfaceAction = running ? (practiceMode ? "record" : "stop") : "start";
+  const surfaceHint = tapAnywhere
+    ? `Click or tap anywhere to ${surfaceAction}`
+    : `Press Space or a controller button to ${surfaceAction}`;
   const selectMode = (nextPracticeMode: boolean) => {
     if (nextPracticeMode === practiceMode) return;
     setOptionsOpen(false);
@@ -638,6 +681,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
     onPracticeModeChange(nextPracticeMode);
   };
   const handleSurfaceClick = () => {
+    if (!tapAnywhere) return;
     if (suppressSurfaceClick.current) {
       suppressSurfaceClick.current = false;
       return;
@@ -650,10 +694,10 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   return (
     <div
       ref={timerSurface}
-      className={`guided-timer ${running ? "running" : ""} ${practiceMode ? "practice" : ""}`}
+      className={`guided-timer ${running ? "running" : ""} ${practiceMode ? "practice" : ""} ${tapAnywhere ? "tap-anywhere" : ""}`}
       tabIndex={-1}
       onPointerDown={(event) => {
-        if (isTimerControl(event.target) || !runningRef.current || !practiceMode) return;
+        if (!tapAnywhere || isTimerControl(event.target) || !runningRef.current || !practiceMode) return;
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
         suppressSurfaceClick.current = true;
@@ -670,6 +714,15 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
           <button type="button" className={!practiceMode ? "active" : ""} aria-pressed={!practiceMode} disabled={running} onClick={() => selectMode(false)}>Hunt timer</button>
           <button type="button" className={practiceMode ? "active" : ""} aria-pressed={practiceMode} disabled={running} onClick={() => selectMode(true)}>Practice timer</button>
         </div>
+        <button
+          type="button"
+          className={`timer-tap-toggle ${tapAnywhere ? "active" : ""}`}
+          aria-pressed={tapAnywhere}
+          aria-label={`Tap anywhere to start or stop: ${tapAnywhere ? "on" : "off"}`}
+          title="Tap anywhere to start or stop"
+          disabled={running}
+          onClick={() => setTapAnywhere(!tapAnywhere)}
+        ><Smartphone aria-hidden="true" /></button>
         {(practiceMode || showHuntCueStyle) && <div className="timer-options" ref={options}>
           <button type="button" className="timer-options-trigger" aria-label={`Timer options. Cue style: ${CUE_STYLE_LABELS[cueStyle]}`} aria-expanded={optionsOpen} disabled={running} onClick={() => setOptionsOpen((open) => !open)}><Settings2 aria-hidden="true" /><span>Options</span></button>
           {optionsOpen && <div className="timer-options-popover" role="dialog" aria-label="Timer options">
