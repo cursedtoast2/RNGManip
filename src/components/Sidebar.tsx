@@ -7,7 +7,6 @@ type NavEntry = { route: Route; label: string; short: string };
 const NAV: readonly NavEntry[] = [
   { route: "/", label: "Home", short: "HM" },
   { route: "/frlg", label: "FireRed / LeafGreen", short: "FR" },
-  { route: "/rse", label: "Ruby / Sapphire / Emerald", short: "RSE" },
 ];
 
 export default function Sidebar({ route, collapsed, onToggle, onNavigate }: {

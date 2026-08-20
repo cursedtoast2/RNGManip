@@ -23,14 +23,17 @@ export default function Landing() {
             </div>
           </a>
 
-          <a className="game-card" href={routeHref("/rse")}>
+          <div className="game-card disabled" aria-disabled="true">
             <div className="game-card-body">
-              <h2>Ruby / Sapphire / Emerald</h2>
+              <div className="game-card-heading">
+                <h2>Ruby / Sapphire / Emerald</h2>
+                <span className="game-card-badge">Coming soon</span>
+              </div>
               <p>
                 The hunt workflow for Gen 3 Hoenn: starters plus legendary, stationary, gift, and fossil encounters.
               </p>
             </div>
-          </a>
+          </div>
         </section>
       </div>
     </div>
