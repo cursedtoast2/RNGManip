@@ -14,14 +14,18 @@ import {
   PRACTICE_RESTART_GUARD_MS,
   PRESS_CLICK_DURATION_MS,
   PRESS_CLICK_HZ,
+  findPracticeDeadlineIndex,
+  formatPracticeFrames,
   getCueFrequency,
   getCueSchedule,
   getMedianTimingOffset,
   getPracticeFrameOffset,
   getPracticeStreaks,
+  getPracticeTailDurations,
   judgePracticePress,
   type CueStyle,
   type PracticeJudgment,
+  type PracticeOutcome,
 } from "../engine/timer";
 
 export type PrecisionAudioState = {
@@ -370,13 +374,10 @@ export function CueStyleSelector({ value, disabled = false, label, onChange }: {
   );
 }
 
+const PRACTICE_FLASH_MS = 900;
+
 export type TimerPhase = { label: string; ms: number };
 export type PracticeFeedback = { phase: number; deltaMs: number; judgment: PracticeJudgment };
-
-function formatPracticeFeedback(feedback: PracticeFeedback): string {
-  if (feedback.judgment === "target") return "Target window";
-  return `${Math.round(Math.abs(feedback.deltaMs)).toLocaleString()} ms ${feedback.judgment}`;
-}
 
 function formatPracticeBias(deltaMs: number): string {
   const rounded = Math.round(deltaMs);
@@ -389,8 +390,9 @@ function formatSignedNumber(value: number): string {
   return `${value > 0 ? "+" : "−"}${Math.abs(value).toLocaleString()}`;
 }
 
-function PracticeSupport({ history, targetFrameMs }: {
+function PracticeSupport({ history, outcomes, targetFrameMs }: {
   history: PracticeFeedback[];
+  outcomes: PracticeOutcome[];
   targetFrameMs: number;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -398,8 +400,8 @@ function PracticeSupport({ history, targetFrameMs }: {
   const frameOffset = latest ? getPracticeFrameOffset(latest.deltaMs, targetFrameMs) : null;
   const deltas = history.map((feedback) => feedback.deltaMs);
   const medianMs = getMedianTimingOffset(deltas);
-  const streaks = getPracticeStreaks(history.map((feedback) => feedback.judgment));
-  const successCount = history.filter((feedback) => feedback.judgment === "target").length;
+  const streaks = getPracticeStreaks(outcomes);
+  const successCount = outcomes.filter((outcome) => outcome === "target").length;
 
   return (
     <div className={`practice-support ${expanded ? "expanded" : ""}`} data-timer-control>
@@ -408,7 +410,7 @@ function PracticeSupport({ history, targetFrameMs }: {
         <span><small>Last frame</small><b>{frameOffset === null ? "—" : frameOffset === 0 ? "Target (0)" : formatSignedNumber(frameOffset)}</b></span>
         <span><small>Median</small><b>{medianMs === null ? "—" : formatPracticeBias(medianMs)}</b></span>
         <span><small>Streak</small><b>{streaks.current} · best {streaks.best}</b></span>
-        <span><small>Exact</small><b>{successCount}/{history.length}</b></span>
+        <span><small>Exact</small><b>{successCount}/{outcomes.length}</b></span>
       </div>}
     </div>
   );
@@ -459,9 +461,8 @@ function isTimerControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("button, input, select, textarea, a, [data-timer-control]") !== null;
 }
 
-export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, focusRequest, practiceMode, onPracticeModeChange, cueStyle, onCueStyleChange, showHuntCueStyle = false, audioState, onStarted, onFinished }: {
+export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, practiceMode, onPracticeModeChange, cueStyle, onCueStyleChange, showHuntCueStyle = false, audioState, onStarted, onFinished }: {
   huntPhases: TimerPhase[];
-  practiceMs: number;
   targetFrameMs: number;
   active: boolean;
   focusRequest: number;
@@ -474,17 +475,23 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   onStarted?: () => void;
   onFinished?: () => void;
 }) {
-  const practicePhases = useMemo(() => [{ label: "Practice", ms: practiceMs }], [practiceMs]);
-  const phaseModel = practiceMode ? practicePhases : huntPhases;
+  const practiceAvailable = huntPhases.length > 0;
+  const practiceRun = practiceMode && practiceAvailable;
+  const practicePhases = useMemo(() => {
+    const tails = getPracticeTailDurations(huntPhases.map((phase) => phase.ms));
+    return huntPhases.map((phase, index) => ({ label: phase.label, ms: tails[index] }));
+  }, [huntPhases]);
+  const phaseModel = practiceRun ? practicePhases : huntPhases;
   const phases = useMemo(() => phaseModel.map((phase) => phase.ms), [phaseModel]);
   const runPhases = useMemo(() => phases.map((duration) => Math.max(1, duration)), [phases]);
   const [running, setRunning] = useState(false);
   const [remaining, setRemaining] = useState(phases[0]);
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [beepStep, setBeepStep] = useState(0);
-  const [practiceFeedback, setPracticeFeedback] = useState<PracticeFeedback | null>(null);
-  const [practiceMissed, setPracticeMissed] = useState(false);
+  const [practiceFlash, setPracticeFlash] = useState<PracticeFeedback | null>(null);
+  const [practiceSummary, setPracticeSummary] = useState<(PracticeFeedback | null)[] | null>(null);
   const [practiceHistory, setPracticeHistory] = useState<PracticeFeedback[]>([]);
+  const [practiceOutcomes, setPracticeOutcomes] = useState<PracticeOutcome[]>([]);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const tapAnywhere = useTapAnywhere();
   const timerWorker = useRef<Worker | null>(null);
@@ -496,13 +503,15 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   const runningRef = useRef(false);
   const commandToken = useRef(0);
   const phaseDeadlines = useRef<number[]>([]);
+  const practicePresses = useRef<(PracticeFeedback | null)[]>([]);
+  const practiceFlashTimeout = useRef<number | null>(null);
   const practiceRestartAllowedAt = useRef(0);
   const suppressSurfaceClick = useRef(false);
   const wakeLock = useRef<ScreenWakeLock>(createScreenWakeLock());
   const activePhases = useRef<number[]>(runPhases);
-  const practiceModeRef = useRef(practiceMode);
+  const practiceModeRef = useRef(practiceRun);
 
-  useEffect(() => { practiceModeRef.current = practiceMode; }, [practiceMode]);
+  useEffect(() => { practiceModeRef.current = practiceRun; }, [practiceRun]);
   useEffect(() => { onStartedRef.current = onStarted; }, [onStarted]);
   useEffect(() => { onFinishedRef.current = onFinished; }, [onFinished]);
   useEffect(() => {
@@ -513,9 +522,10 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   }, [phases]);
   useEffect(() => {
     if (!runningRef.current) {
-      setPracticeFeedback(null);
+      setPracticeFlash(null);
+      setPracticeSummary(null);
       setPracticeHistory([]);
-      setPracticeMissed(false);
+      setPracticeOutcomes([]);
     }
   }, [cueStyle]);
   useEffect(() => {
@@ -558,7 +568,12 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
             stopPrecisionAudio(audioState);
             releaseScreenWakeLock(wakeLock.current);
             practiceRestartAllowedAt.current = performance.timeOrigin + performance.now() + PRACTICE_RESTART_GUARD_MS;
-            setPracticeMissed(true);
+            const results = practicePresses.current.slice();
+            setPracticeSummary(results);
+            setPracticeOutcomes((outcomes) => [...outcomes, ...results.map((entry): PracticeOutcome => entry?.judgment ?? "missed")]);
+            if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
+            practiceFlashTimeout.current = null;
+            setPracticeFlash(null);
             setRunning(false);
             setBeepStep(6);
           }, 1000);
@@ -594,13 +609,16 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
     releaseScreenWakeLock(wakeLock.current);
     if (finishTimeout.current !== null) window.clearTimeout(finishTimeout.current);
     finishTimeout.current = null;
+    if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
+    practiceFlashTimeout.current = null;
     setRunning(false);
     setPhaseIndex(0);
     setRemaining(phases[0]);
     setBeepStep(0);
-    setPracticeFeedback(null);
-    setPracticeMissed(false);
+    setPracticeFlash(null);
+    setPracticeSummary(null);
     phaseDeadlines.current = [];
+    practicePresses.current = [];
     practiceRestartAllowedAt.current = 0;
   }, [audioState, phases]);
 
@@ -614,11 +632,14 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
     setPhaseIndex(0);
     setRemaining(phases[0]);
     setBeepStep(0);
-    setPracticeFeedback(null);
-    setPracticeMissed(false);
+    setPracticeFlash(null);
+    setPracticeSummary(null);
     phaseDeadlines.current = [];
+    practicePresses.current = runPhases.map(() => null);
     if (finishTimeout.current !== null) window.clearTimeout(finishTimeout.current);
     finishTimeout.current = null;
+    if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
+    practiceFlashTimeout.current = null;
     setRunning(true);
     requestScreenWakeLock(wakeLock.current);
     timerWorker.current?.postMessage({ type: "stop" });
@@ -640,39 +661,34 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   }, [audioState, cueStyle, phases, practiceMode, runPhases]);
 
   const recordPracticePress = useCallback((pressedAt: number) => {
-    const deadline = phaseDeadlines.current[0];
-    if (deadline === undefined) return;
+    const deadlines = phaseDeadlines.current;
+    const index = findPracticeDeadlineIndex(pressedAt, deadlines);
+    if (index < 0) return;
 
     playPressClick(audioState);
-    const deltaMs = pressedAt - deadline;
+    if (practicePresses.current[index]) return;
+    const deltaMs = pressedAt - deadlines[index];
     const feedback = {
-      phase: 0,
+      phase: index,
       deltaMs,
       judgment: judgePracticePress(deltaMs, targetFrameMs),
     } satisfies PracticeFeedback;
-    setPracticeFeedback(feedback);
-    setPracticeMissed(false);
+    practicePresses.current[index] = feedback;
+    if (feedback.judgment === "target") playPracticeHitCue(audioState);
+    setPracticeFlash(feedback);
     setPracticeHistory((history) => [...history, feedback]);
     practiceRestartAllowedAt.current = pressedAt + PRACTICE_RESTART_GUARD_MS;
-
-    if (finishTimeout.current !== null) window.clearTimeout(finishTimeout.current);
-    finishTimeout.current = null;
-    commandToken.current += 1;
-    runningRef.current = false;
-    releaseScreenWakeLock(wakeLock.current);
-    timerWorker.current?.postMessage({ type: "stop" });
-    stopPrecisionAudio(audioState);
-    if (feedback.judgment === "target") playPracticeHitCue(audioState);
-    setRunning(false);
-    setPhaseIndex(0);
-    setRemaining(0);
-    setBeepStep(6);
+    if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
+    practiceFlashTimeout.current = window.setTimeout(() => {
+      practiceFlashTimeout.current = null;
+      setPracticeFlash(null);
+    }, PRACTICE_FLASH_MS);
   }, [audioState, targetFrameMs]);
 
   const startFromInput = useCallback((pressedAt = performance.timeOrigin + performance.now()) => {
-    if (practiceMode && pressedAt < practiceRestartAllowedAt.current) return;
+    if (practiceRun && pressedAt < practiceRestartAllowedAt.current) return;
     void start(pressedAt);
-  }, [practiceMode, start]);
+  }, [practiceRun, start]);
 
   useEffect(() => {
     if (!active) stop();
@@ -684,32 +700,35 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
       const element = event.target as HTMLElement | null;
       if (element?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT", "A", "BUTTON"].includes(element?.tagName ?? "")) return;
       event.preventDefault();
-      if (runningRef.current && practiceMode) recordPracticePress(getInputEventAbsoluteTime(event));
+      if (runningRef.current && practiceRun) recordPracticePress(getInputEventAbsoluteTime(event));
       else if (runningRef.current) stop();
       else startFromInput(getInputEventAbsoluteTime(event));
     };
     window.addEventListener("keydown", handleSpace);
     return () => window.removeEventListener("keydown", handleSpace);
-  }, [active, practiceMode, recordPracticePress, startFromInput, stop]);
+  }, [active, practiceRun, recordPracticePress, startFromInput, stop]);
 
   const handleGamepadPress = useCallback((pressedAt: number) => {
-    if (runningRef.current && practiceMode) recordPracticePress(pressedAt);
+    if (runningRef.current && practiceRun) recordPracticePress(pressedAt);
     else if (runningRef.current) stop();
     else startFromInput(pressedAt);
-  }, [practiceMode, recordPracticePress, startFromInput, stop]);
+  }, [practiceRun, recordPracticePress, startFromInput, stop]);
   useGamepadPress(active, handleGamepadPress);
 
   useEffect(() => () => {
     if (finishTimeout.current !== null) window.clearTimeout(finishTimeout.current);
+    if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
     releaseScreenWakeLock(wakeLock.current);
   }, []);
 
-  const showPracticeJudgment = practiceMode && !running && practiceFeedback !== null;
-  const showMissedPractice = practiceMode && !running && practiceMissed;
-  const display = showPracticeJudgment
-    ? formatPracticeFeedback(practiceFeedback)
-    : showMissedPractice ? "No press recorded" : formatDuration(remaining);
-  const surfaceAction = running ? (practiceMode ? "record" : "stop") : "start";
+  const summaryTargets = practiceSummary?.filter((entry) => entry?.judgment === "target").length ?? 0;
+  const judgmentTone = practiceFlash?.judgment ?? (practiceSummary ? (summaryTargets === practiceSummary.length ? "target" : summaryTargets === 0 ? "missed" : null) : null);
+  const display = practiceFlash
+    ? formatPracticeFrames(practiceFlash.deltaMs, targetFrameMs)
+    : practiceSummary && !running
+      ? `${summaryTargets}/${practiceSummary.length} in target`
+      : formatDuration(remaining);
+  const surfaceAction = running ? (practiceRun ? "record" : "stop") : "start";
   const surfaceHint = tapAnywhere
     ? `Click or tap anywhere to ${surfaceAction}`
     : `Press Space or a controller button to ${surfaceAction}`;
@@ -726,7 +745,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
       suppressSurfaceClick.current = false;
       return;
     }
-    if (runningRef.current && practiceMode) recordPracticePress(performance.timeOrigin + performance.now());
+    if (runningRef.current && practiceRun) recordPracticePress(performance.timeOrigin + performance.now());
     else if (runningRef.current) stop();
     else startFromInput();
   };
@@ -734,10 +753,10 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
   return (
     <div
       ref={timerSurface}
-      className={`guided-timer ${running ? "running" : ""} ${practiceMode ? "practice" : ""} ${tapAnywhere ? "tap-anywhere" : ""}`}
+      className={`guided-timer ${running ? "running" : ""} ${practiceRun ? "practice" : ""} ${tapAnywhere ? "tap-anywhere" : ""}`}
       tabIndex={-1}
       onPointerDown={(event) => {
-        if (!tapAnywhere || isTimerControl(event.target) || !runningRef.current || !practiceMode) return;
+        if (!tapAnywhere || isTimerControl(event.target) || !runningRef.current || !practiceRun) return;
         event.preventDefault();
         event.currentTarget.setPointerCapture(event.pointerId);
         suppressSurfaceClick.current = true;
@@ -750,10 +769,10 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
       }}
     >
       <div className="timer-toolbar" data-timer-control>
-        <div className="timer-mode-switch" role="group" aria-label="Timer mode">
-          <button type="button" className={!practiceMode ? "active" : ""} aria-pressed={!practiceMode} disabled={running} onClick={() => selectMode(false)}>Hunt timer</button>
-          <button type="button" className={practiceMode ? "active" : ""} aria-pressed={practiceMode} disabled={running} onClick={() => selectMode(true)}>Practice timer</button>
-        </div>
+        {practiceAvailable && <div className="timer-mode-switch" role="group" aria-label="Timer mode">
+          <button type="button" className={!practiceRun ? "active" : ""} aria-pressed={!practiceRun} disabled={running} onClick={() => selectMode(false)}>Hunt timer</button>
+          <button type="button" className={practiceRun ? "active" : ""} aria-pressed={practiceRun} disabled={running} onClick={() => selectMode(true)}>Practice timer</button>
+        </div>}
         <button
           type="button"
           className={`timer-tap-toggle ${tapAnywhere ? "active" : ""}`}
@@ -763,7 +782,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
           disabled={running}
           onClick={() => setTapAnywhere(!tapAnywhere)}
         ><Smartphone aria-hidden="true" /></button>
-        {(practiceMode || showHuntCueStyle) && <div className="timer-options" ref={options}>
+        {(practiceRun || showHuntCueStyle) && <div className="timer-options" ref={options}>
           <button type="button" className="timer-options-trigger" aria-label={`Timer options. Cue style: ${CUE_STYLE_LABELS[cueStyle]}`} aria-expanded={optionsOpen} disabled={running} onClick={() => setOptionsOpen((open) => !open)}><Settings2 aria-hidden="true" /><span>Options</span></button>
           {optionsOpen && <div className="timer-options-popover" role="dialog" aria-label="Timer options">
             <span className="timer-options-label">Cue style</span>
@@ -772,12 +791,19 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
         </div>}
       </div>
       <div className="timer-stage">
-        {!practiceMode && <div className="timer-phase" aria-live="polite">{phaseModel[phaseIndex]?.label}</div>}
-        <div className={`timer-numbers ${showPracticeJudgment ? `practice-${practiceFeedback.judgment}` : showMissedPractice ? "practice-missed" : ""}`} aria-live="polite">{display}</div>
-        <div className="timer-beats" aria-label="Action timer beat"><span className={`${beepStep >= 6 ? "heard" : ""} action-beat`}>Press</span></div>
+        <div className="timer-phase" aria-live="polite">{practiceSummary && !running ? "Run complete" : phaseModel[phaseIndex]?.label}</div>
+        <div className={`timer-numbers ${judgmentTone ? `practice-${judgmentTone}` : ""}`} aria-live="polite">{display}</div>
+        {practiceSummary && !running
+          ? <ul className="practice-summary" aria-label="Practice run results">
+            {practiceSummary.map((entry, index) => <li className={`practice-${entry?.judgment ?? "missed"}`} key={index}>
+              <span>{phaseModel[index]?.label}</span>
+              <b>{entry ? formatPracticeFrames(entry.deltaMs, targetFrameMs) : "No press"}</b>
+            </li>)}
+          </ul>
+          : <div className="timer-beats" aria-label="Action timer beat"><span className={`${beepStep >= 6 ? "heard" : ""} action-beat`}>Press</span></div>}
       </div>
       <div className="timer-surface-hint">{surfaceHint}</div>
-      {practiceMode && <PracticeSupport history={practiceHistory} targetFrameMs={targetFrameMs} />}
+      {practiceRun && <PracticeSupport history={practiceHistory} outcomes={practiceOutcomes} targetFrameMs={targetFrameMs} />}
       <TimerInputLegend />
     </div>
   );

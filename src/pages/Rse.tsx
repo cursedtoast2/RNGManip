@@ -38,7 +38,7 @@ import {
   type RseIdState,
 } from "../engine/rseSid";
 import { isRseGenderless } from "../engine/rseSpecies";
-import { PRACTICE_COUNTDOWN_MS, type CueStyle } from "../engine/timer";
+import { type CueStyle } from "../engine/timer";
 
 type Stage = "setup" | "target" | "attempt" | "result";
 
@@ -695,7 +695,6 @@ function AttemptPage({
 }) {
   const [practiceMode, setPracticeMode] = useState(false);
   const phases = useMemo(() => huntPhases(target, encounter, calibrationMs), [calibrationMs, encounter, target]);
-  const practiceMs = PRACTICE_COUNTDOWN_MS;
 
   const handleApply = (hitAdvance: number, apply: boolean) => {
     onHitRecorded({ advanceDelta: target.advance - hitAdvance });
@@ -710,7 +709,6 @@ function AttemptPage({
         <GuidedTimer
           key={`${targetKey(target)}-${attempts}`}
           huntPhases={phases}
-          practiceMs={practiceMs}
           targetFrameMs={consoleFramesToMs(1, target.consoleName)}
           active={view === "attempt"}
           focusRequest={focusRequest}

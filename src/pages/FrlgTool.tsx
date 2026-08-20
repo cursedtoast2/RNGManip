@@ -28,10 +28,7 @@ import {
 } from "../engine/encounters";
 import { isGenderless } from "../engine/species";
 import { loadSeedData } from "../engine/seedData";
-import {
-  PRACTICE_COUNTDOWN_MS,
-  type CueStyle,
-} from "../engine/timer";
+import { type CueStyle } from "../engine/timer";
 import {
   GuidedTimer,
   createPrecisionAudioState,
@@ -478,7 +475,6 @@ function SidSetupTimer({ cueStyle, onCueStyleChange, audioState, active, duratio
               <div className="sid-timer-timer">
                 <GuidedTimer
                   huntPhases={huntPhases}
-                  practiceMs={PRACTICE_COUNTDOWN_MS}
                   targetFrameMs={targetFrameMs}
                   active={active && open}
                   focusRequest={0}
@@ -881,7 +877,6 @@ function AttemptPage({
 }) {
   const [practiceMode, setPracticeMode] = useState(false);
   const huntPhases = useMemo(() => encounterTimerPhases(target, encounter, calibration), [calibration, encounter, target]);
-  const practiceMs = PRACTICE_COUNTDOWN_MS;
 
   const handleApply = (hitSeedMs: number, hitContinueFrames: number, apply: boolean) => {
     const openingDelta = target.seedMs - hitSeedMs;
@@ -905,7 +900,6 @@ function AttemptPage({
         <GuidedTimer
           key={`${targetKey(target)}-${attempts}`}
           huntPhases={huntPhases}
-          practiceMs={practiceMs}
           targetFrameMs={consoleFramesToMs(1, target.consoleName)}
           active={view === "attempt" && timersActive}
           focusRequest={focusRequest}

@@ -266,6 +266,14 @@ svg { width: 18px; height: 18px; }
 .timer-numbers.practice-late { color: var(--red); }
 .timer-numbers.practice-target { color: var(--green); }
 .timer-numbers.practice-missed { color: var(--red); font-size: clamp(34px, 4vw, 54px); }
+.practice-summary { width: min(420px, 100%); min-height: 112px; margin: 30px auto 0; padding: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; list-style: none; }
+.practice-summary li { border-bottom: 1px solid var(--line); padding: 6px 2px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; text-align: left; }
+.practice-summary li:last-child { border-bottom: 0; }
+.practice-summary li b { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.practice-summary li.practice-early b { color: var(--blue); }
+.practice-summary li.practice-late b { color: var(--red); }
+.practice-summary li.practice-target b { color: var(--green); }
+.practice-summary li.practice-missed b { color: var(--red); }
 .timer-beats { min-height: 112px; margin-top: 30px; display: flex; align-items: center; justify-content: center; gap: 18px; }
 .timer-beats span { width: 76px; height: 76px; display: grid; place-items: center; border: 3px solid var(--line-strong); border-radius: 50%; color: var(--muted); font-size: 20px; font-weight: 750; }
 .timer-beats span.heard { color: #211d29; background: var(--purple); border-color: var(--purple); }
@@ -402,6 +410,7 @@ svg { width: 18px; height: 18px; }
   .target-search-controls { grid-template-columns: repeat(5, 150px); overflow-x: auto; }
   .timer-numbers { font-size: 40px; }
   .timer-beats { min-height: 90px; margin-top: 22px; gap: 8px; }
+  .practice-summary { min-height: 90px; margin-top: 22px; }
   .timer-beats span { width: 58px; height: 58px; font-size: 17px; }
   .timing-controls { overflow-x: auto; justify-content: start; }
   .result-observations { overflow-x: auto; max-width: 100%; }
@@ -503,6 +512,7 @@ svg { width: 18px; height: 18px; }
   .timer-phase { margin-bottom: 6px; }
   .timer-numbers { font-size: clamp(30px, 7vh, 44px); }
   .timer-beats { min-height: 60px; margin-top: 12px; }
+  .practice-summary { min-height: 60px; margin-top: 12px; font-size: 12px; }
   .timer-beats span { width: 50px; height: 50px; font-size: 15px; }
   .setup-page { padding-top: 22px; padding-bottom: 28px; }
 }

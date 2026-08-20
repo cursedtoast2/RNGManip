@@ -5,7 +5,7 @@ export const ACTION_CUE_HZ = 1760;
 export const ACTION_CUE_DURATION_MS = 160;
 export const PRACTICE_HIT_CUE_HZ = 660;
 export const PRACTICE_HIT_CUE_DURATION_MS = 600;
-export const PRACTICE_COUNTDOWN_MS = 3000;
+export const PRACTICE_PHASE_TAIL_MS = 5000;
 export const PRACTICE_RESTART_GUARD_MS = 500;
 export const DRUMROLL_TICK_HZ = 960;
 export const DRUMROLL_TICK_DURATION_MS = 60;
@@ -16,6 +16,7 @@ export const PRESS_CLICK_DURATION_MS = 30;
 export const GLIDE_DURATION_MS = 1000;
 
 export type PracticeJudgment = "early" | "target" | "late";
+export type PracticeOutcome = PracticeJudgment | "missed";
 export type CueStyle = "standard" | "scale" | "glide" | "roll-target" | "roll-long" | "roll-silent";
 export const CUE_STYLES: CueStyle[] = ["standard", "scale", "glide", "roll-target", "roll-long", "roll-silent"];
 export type StyledCue = { atMs: number; kind: "beat" | "tick" | "action" | "glide"; beat: number | null; durationMs?: number };
@@ -75,7 +76,31 @@ export function getPracticeFrameOffset(deltaMs: number, targetFrameMs: number): 
   return Math.round(deltaMs / targetFrameMs);
 }
 
-export function getPracticeStreaks(judgments: PracticeJudgment[]): { current: number; best: number } {
+export function formatPracticeFrames(deltaMs: number, targetFrameMs: number): string {
+  const judgment = judgePracticePress(deltaMs, targetFrameMs);
+  if (judgment === "target") return "Target";
+  const frames = Math.max(1, Math.abs(getPracticeFrameOffset(deltaMs, targetFrameMs)));
+  return `${judgment === "late" ? "+" : "−"}${frames.toLocaleString()} frame${frames === 1 ? "" : "s"}`;
+}
+
+export function getPracticeTailDurations(phaseDurations: number[]): number[] {
+  return phaseDurations.map((duration) => Math.max(1, Math.min(duration, PRACTICE_PHASE_TAIL_MS)));
+}
+
+export function findPracticeDeadlineIndex(pressedAt: number, deadlines: number[]): number {
+  let index = -1;
+  let closest = Infinity;
+  deadlines.forEach((deadline, candidate) => {
+    const distance = Math.abs(pressedAt - deadline);
+    if (distance < closest) {
+      closest = distance;
+      index = candidate;
+    }
+  });
+  return index;
+}
+
+export function getPracticeStreaks(judgments: PracticeOutcome[]): { current: number; best: number } {
   let run = 0;
   let best = 0;
   for (const judgment of judgments) {
