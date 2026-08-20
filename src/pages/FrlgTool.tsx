@@ -1,4 +1,4 @@
-import { Check, ChevronDown, RefreshCcw, X } from "lucide-react";
+import { Check, ChevronDown, RefreshCcw, Target as TargetIcon, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -1247,9 +1247,9 @@ export function ResultEntry({
 
       <div className="result-body">
         {matches !== null && matches.length === 0 && <div className="result-status"><b>No match in this range.</b><span>Check the values or widen the seed and advance ranges.</span></div>}
-        {matches !== null && matches.length > 0 && <div className="hit-table" aria-label={matches.length === 1 ? "Identified hit" : "Possible hits"}>
+        <div className="hit-table" aria-label={matches === null || matches.length === 0 ? "Your target" : matches.length === 1 ? "Identified hit" : "Possible hits"}>
           <div className={`hit-table-head ${rowClasses}`}><span /><span>Seed</span><span>Advance</span>{switchConsole && <span>Continue screen frames</span>}<span>PID</span><span>Nature</span>{!genderless && <span>Gender</span>}</div>
-          <div className="hit-table-body">{matches.map((match, matchIndex) => {
+          {matches !== null && matches.length > 0 && <div className="hit-table-body">{matches.map((match, matchIndex) => {
             const matchKey = hitResultKey(match);
             const selected = matches.length === 1 || selectedPossibleHitKey === matchKey;
             const manuallySelected = matches.length > 1 && selectedPossibleHitKey === matchKey;
@@ -1268,8 +1268,21 @@ export function ResultEntry({
                 </div>
               </div>}
             </Fragment>;
-          })}</div>
-        </div>}
+          })}</div>}
+          <div className="hit-target-reference" aria-label="Your target for this hunt">
+            <div className="hit-target-caption">Your target</div>
+            <div className={`hit-row target-reference ${rowClasses}`}>
+              <span className="row-radio target-marker" aria-hidden="true"><TargetIcon /></span>
+              <RowCell label="Seed"><b>{target.seed}</b></RowCell>
+              <RowCell label="Advance"><b>{target.advance.toLocaleString()}</b></RowCell>
+              {switchConsole && <RowCell label="Continue frames"><b>{target.continueFrames.toLocaleString()}</b></RowCell>}
+              <RowCell label="PID"><b>{target.pid.toString(16).toUpperCase().padStart(8, "0")}</b></RowCell>
+              <RowCell label="Nature"><b>{target.nature}</b></RowCell>
+              {!genderless && <RowCell label="Gender"><b>{target.gender}</b></RowCell>}
+              <IvSpread ivs={target.ivs} />
+            </div>
+          </div>
+        </div>
       </div>
 
     </section>

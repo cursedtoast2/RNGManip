@@ -345,6 +345,12 @@ svg { width: 18px; height: 18px; }
 .hit-row:first-child { border-top: 0; }
 @media (hover: hover) and (pointer: fine) { .hit-row:hover { background: var(--surface-2); } }
 .hit-row.selected { background: var(--purple-dark); box-shadow: inset 3px 0 var(--purple); }
+/* Sticky so a long match list scrolls against the target instead of burying it. */
+.hit-target-reference { position: sticky; bottom: 0; z-index: 1; border-top: 2px solid var(--line-strong); background: #22232c; }
+.hit-target-caption { padding: 10px 12px 0; color: var(--subtle); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.hit-row.target-reference { min-height: 56px; border-top: 0; cursor: default; }
+.hit-row.target-reference .row-radio { border-style: dashed; color: var(--subtle); background: transparent; }
+@media (hover: hover) and (pointer: fine) { .hit-row.target-reference:hover { background: transparent; } }
 .hit-calibration { min-width: 1080px; min-height: 82px; border: 1px solid var(--line); border-top: 0; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 18px; background: var(--surface); }
 .hit-calibration-values { flex: 1; display: grid; grid-template-columns: 90px repeat(2, minmax(190px, 1fr)); align-items: center; gap: 18px; }
 .hit-calibration-values > span { color: var(--subtle); font-size: 12px; font-weight: 650; }
