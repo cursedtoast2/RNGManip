@@ -262,9 +262,8 @@ function FrlgTool({ cueStyle, onCueStyleChange }: { cueStyle: CueStyle; onCueSty
       const secretId = Number(hunt.secretId);
       return Number.isInteger(secretId) && secretId >= 0 && secretId <= 65535 ? [{ advance: -1, sid: secretId }] : [];
     }
-    const candidateCount = hunt.language === "English" && !hunt.rivalNamed ? 50 : hunt.language === "English" ? 51 : 101;
-    return generateSidCandidates(trainerId, hunt.language, hunt.rivalNamed, candidateCount);
-  }, [hunt.language, hunt.rivalNamed, hunt.secretId, hunt.sidMode, trainerId, trainerIdValid]);
+    return generateSidCandidates(trainerId, hunt.language, hunt.rivalNamed, hunt.console);
+  }, [hunt.console, hunt.language, hunt.rivalNamed, hunt.secretId, hunt.sidMode, trainerId, trainerIdValid]);
   const currentSid = sidCandidates[Math.min(sidIndex, Math.max(0, sidCandidates.length - 1))]?.sid ?? null;
   const targetSeedIndex = useMemo(() => {
     const guideSeed = seeds.findIndex((entry) => entry.initialSeed === 0xF492);

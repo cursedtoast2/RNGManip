@@ -197,22 +197,32 @@ const LANGUAGE_OFFSETS: Record<string, number> = {
   Spanish: 202,
 };
 
+export const SID_ADVANCE_RADIUS_SWITCH = 40;
+
+export const SID_ADVANCE_RADIUS_RETAIL = 10;
+
 export function generateSidCandidates(
   trainerId: number,
   language: string,
   rivalNamed: boolean,
-  count = 11,
+  consoleName: ConsoleName,
+  count?: number,
 ): Array<{ advance: number; sid: number }> {
-  const center = (SID_SETUP_ADVANCES + (LANGUAGE_OFFSETS[language] ?? LANGUAGE_OFFSETS.English)) * 2;
-  const firstAdvance = center - 50;
-  const nearbyAdvances = Array.from({ length: 101 }, (_, index) => firstAdvance + index);
+  // Switch runs the intro RNG at two advances per frame, so both the setup timer and the
+  // post-A-press text box cost double what they do on retail hardware.
+  const advancesPerFrame = isSwitchConsole(consoleName) ? 2 : 1;
+  const center = (SID_SETUP_ADVANCES + (LANGUAGE_OFFSETS[language] ?? LANGUAGE_OFFSETS.English)) * advancesPerFrame;
+  const radius = isSwitchConsole(consoleName) ? SID_ADVANCE_RADIUS_SWITCH : SID_ADVANCE_RADIUS_RETAIL;
+  const firstAdvance = center - radius;
+  const nearbyAdvances = Array.from({ length: radius * 2 + 1 }, (_, index) => firstAdvance + index);
   const enforceEnglishParity = language === "English";
   const wantedParity = rivalNamed ? center & 1 : (center + 1) & 1;
   const advances = nearbyAdvances
     .filter((advance) => !enforceEnglishParity || (advance & 1) === wantedParity)
-    .slice(0, count);
+    .sort((a, b) => Math.abs(a - center) - Math.abs(b - center) || a - b);
 
-  return advances.map((advance) => ({ advance, sid: generateSidAtAdvance(trainerId, advance) }));
+  return (count === undefined ? advances : advances.slice(0, count))
+    .map((advance) => ({ advance, sid: generateSidAtAdvance(trainerId, advance) }));
 }
 
 function matchesFilter(generated: GeneratedPokemon, filter: TargetFilter): boolean {
