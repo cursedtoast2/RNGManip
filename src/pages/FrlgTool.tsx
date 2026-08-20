@@ -596,13 +596,13 @@ function SetupPage({ hunt, setHunt, trainerIdValid, cueStyle, onCueStyleChange, 
 
                     {hunt.sidMode === "new-save" && <>
                       <p className="setup-field-note">These are the Secret IDs your save could have. You confirm which one is yours from the first hunt result.</p>
-                      <div className="setup-subfield">
+                      {isSwitchConsole(hunt.console) && <div className="setup-subfield">
                         <p className="setup-sub-label" id="setup-rival-label">When this save was created, was the rival’s name typed in?</p>
                         <div className="setup-segments two" role="group" aria-labelledby="setup-rival-label">
                           <button type="button" aria-pressed={hunt.rivalNamed} className={hunt.rivalNamed ? "selected" : ""} onClick={() => update("rivalNamed", true)}>Yes, I typed a name</button>
                           <button type="button" aria-pressed={!hunt.rivalNamed} className={!hunt.rivalNamed ? "selected" : ""} onClick={() => update("rivalNamed", false)}>No, I picked a preset</button>
                         </div>
-                      </div>
+                      </div>}
                     </>}
 
                     {hunt.sidMode === "new-save" && <SidSetupTimer cueStyle={cueStyle} onCueStyleChange={onCueStyleChange} audioState={audioState} active durationMs={consoleFramesToMs(SID_SETUP_ADVANCES, hunt.console)} targetFrameMs={consoleFramesToMs(1, hunt.console)} />}
