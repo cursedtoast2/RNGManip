@@ -215,10 +215,13 @@ export function generateSidCandidates(
   const radius = isSwitchConsole(consoleName) ? SID_ADVANCE_RADIUS_SWITCH : SID_ADVANCE_RADIUS_RETAIL;
   const firstAdvance = center - radius;
   const nearbyAdvances = Array.from({ length: radius * 2 + 1 }, (_, index) => firstAdvance + index);
-  const enforceEnglishParity = language === "English";
+  // The rival-name shift is a one-advance effect, so it only exists where a frame holds two
+  // advances and the A-press can land on either of them. Retail runs one advance per frame and
+  // no retail guide reports it, so there we keep the whole window instead of halving it.
+  const enforceParity = isSwitchConsole(consoleName) && language === "English";
   const wantedParity = rivalNamed ? center & 1 : (center + 1) & 1;
   const advances = nearbyAdvances
-    .filter((advance) => !enforceEnglishParity || (advance & 1) === wantedParity)
+    .filter((advance) => !enforceParity || (advance & 1) === wantedParity)
     .sort((a, b) => Math.abs(a - center) - Math.abs(b - center) || a - b);
 
   return (count === undefined ? advances : advances.slice(0, count))
