@@ -7,14 +7,16 @@ import {
   CUE_STYLES,
   DRUMROLL_TICK_DURATION_MS,
   DRUMROLL_TICK_HZ,
+  GLIDE_DURATION_MS,
+  METRONOME_CUE_HZ,
   PRACTICE_HIT_CUE_DURATION_MS,
   PRACTICE_HIT_CUE_HZ,
   PRACTICE_RESTART_GUARD_MS,
   PRESS_CLICK_DURATION_MS,
   PRESS_CLICK_HZ,
+  getCueFrequency,
   getCueSchedule,
   getMedianTimingOffset,
-  getMetronomeCueFrequency,
   getPracticeFrameOffset,
   getPracticeStreaks,
   judgePracticePress,
@@ -86,7 +88,7 @@ export function stopPrecisionAudio(state: PrecisionAudioState): void {
   }
 }
 
-function schedulePrecisionCue(state: PrecisionAudioState, beat: number, when: number): void {
+function schedulePrecisionCue(state: PrecisionAudioState, beat: number, when: number, style: CueStyle): void {
   const context = ensurePrecisionAudio(state);
   if (!context || context.state !== "running") return;
   const actionCue = beat === 6;
@@ -94,7 +96,7 @@ function schedulePrecisionCue(state: PrecisionAudioState, beat: number, when: nu
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   oscillator.type = "sine";
-  oscillator.frequency.value = actionCue ? ACTION_CUE_HZ : getMetronomeCueFrequency(beat);
+  oscillator.frequency.value = actionCue ? ACTION_CUE_HZ : getCueFrequency(style, beat);
   gain.gain.setValueAtTime(actionCue ? 0.17 : 0.11, when);
   if (actionCue) {
     gain.gain.setValueAtTime(0.17, when + Math.max(0, durationSeconds - 0.008));
@@ -134,6 +136,29 @@ function scheduleDrumrollTick(state: PrecisionAudioState, when: number): void {
   oscillator.stop(when + durationSeconds);
 }
 
+function scheduleGlideCue(state: PrecisionAudioState, when: number, durationSeconds: number): void {
+  const context = ensurePrecisionAudio(state);
+  if (!context || context.state !== "running" || durationSeconds <= 0.05) return;
+  const stoppedAt = when + durationSeconds;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(METRONOME_CUE_HZ, when);
+  oscillator.frequency.exponentialRampToValueAtTime(ACTION_CUE_HZ, stoppedAt);
+  gain.gain.setValueAtTime(0.025, when);
+  gain.gain.exponentialRampToValueAtTime(0.1, stoppedAt - 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.001, stoppedAt);
+  oscillator.connect(gain).connect(context.destination);
+  state.scheduledCues.add(oscillator);
+  oscillator.onended = () => {
+    state.scheduledCues.delete(oscillator);
+    oscillator.disconnect();
+    gain.disconnect();
+  };
+  oscillator.start(when);
+  oscillator.stop(stoppedAt);
+}
+
 export function schedulePrecisionRun(state: PrecisionAudioState, phaseDurations: number[], absoluteStart: number, cueStyle: CueStyle): void {
   const context = ensurePrecisionAudio(state);
   if (!context || context.state !== "running") return;
@@ -146,7 +171,8 @@ export function schedulePrecisionRun(state: PrecisionAudioState, phaseDurations:
       if (cue.atMs <= phaseStart || cue.atMs <= performanceNow) continue;
       const when = audioNow + (cue.atMs - performanceNow) / 1000;
       if (cue.kind === "tick") scheduleDrumrollTick(state, when);
-      else schedulePrecisionCue(state, cue.beat!, when);
+      else if (cue.kind === "glide") scheduleGlideCue(state, when, (cue.durationMs ?? GLIDE_DURATION_MS) / 1000);
+      else schedulePrecisionCue(state, cue.beat!, when, cueStyle);
     }
     phaseStart += duration;
   }
@@ -312,9 +338,20 @@ export function formatDuration(ms: number): string {
 
 const CUE_STYLE_LABELS: Record<CueStyle, string> = {
   standard: "Classic beat",
+  scale: "Rising scale",
+  glide: "Glide",
   "roll-target": "Drumroll",
   "roll-long": "Full roll",
   "roll-silent": "Silent finish",
+};
+
+const CUE_STYLE_HINTS: Record<CueStyle, string> = {
+  standard: "Steady beats leading into the press tone.",
+  scale: "Each beat steps up in pitch, so you hear how close the press is without counting.",
+  glide: "The last second is one continuous rising tone that lands exactly on the press.",
+  "roll-target": "Adds off-beat ticks in the final second.",
+  "roll-long": "Adds off-beat ticks over the final two seconds.",
+  "roll-silent": "Drops the last beat so nothing masks the press tone.",
 };
 
 export function CueStyleSelector({ value, disabled = false, label, onChange }: {
@@ -324,8 +361,11 @@ export function CueStyleSelector({ value, disabled = false, label, onChange }: {
   onChange: (style: CueStyle) => void;
 }) {
   return (
-    <div className="cue-style-selector" role="group" aria-label={label}>
-      {CUE_STYLES.map((style) => <button type="button" aria-pressed={value === style} disabled={disabled} onClick={() => onChange(style)} key={style}>{CUE_STYLE_LABELS[style]}</button>)}
+    <div className="cue-style-selector-group">
+      <div className="cue-style-selector" role="group" aria-label={label}>
+        {CUE_STYLES.map((style) => <button type="button" aria-pressed={value === style} disabled={disabled} onClick={() => onChange(style)} key={style}>{CUE_STYLE_LABELS[style]}</button>)}
+      </div>
+      <p className="cue-style-hint">{CUE_STYLE_HINTS[value]}</p>
     </div>
   );
 }
@@ -727,7 +767,7 @@ export function GuidedTimer({ huntPhases, practiceMs, targetFrameMs, active, foc
           <button type="button" className="timer-options-trigger" aria-label={`Timer options. Cue style: ${CUE_STYLE_LABELS[cueStyle]}`} aria-expanded={optionsOpen} disabled={running} onClick={() => setOptionsOpen((open) => !open)}><Settings2 aria-hidden="true" /><span>Options</span></button>
           {optionsOpen && <div className="timer-options-popover" role="dialog" aria-label="Timer options">
             <span className="timer-options-label">Cue style</span>
-            <CueStyleSelector value={cueStyle} label="Timer cue style" onChange={(nextStyle) => { onCueStyleChange(nextStyle); setOptionsOpen(false); }} />
+            <CueStyleSelector value={cueStyle} label="Timer cue style" onChange={onCueStyleChange} />
           </div>}
         </div>}
       </div>

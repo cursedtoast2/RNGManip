@@ -13,14 +13,21 @@ export const DRUMROLL_TICK_OFFSETS_MS = [750, 250];
 export const DRUMROLL_LONG_TICK_OFFSETS_MS = [1750, 1250, 750, 250];
 export const PRESS_CLICK_HZ = 2400;
 export const PRESS_CLICK_DURATION_MS = 30;
+export const GLIDE_DURATION_MS = 1000;
 
 export type PracticeJudgment = "early" | "target" | "late";
-export type CueStyle = "standard" | "roll-target" | "roll-long" | "roll-silent";
-export const CUE_STYLES: CueStyle[] = ["standard", "roll-target", "roll-long", "roll-silent"];
-export type StyledCue = { atMs: number; kind: "beat" | "tick" | "action"; beat: number | null };
+export type CueStyle = "standard" | "scale" | "glide" | "roll-target" | "roll-long" | "roll-silent";
+export const CUE_STYLES: CueStyle[] = ["standard", "scale", "glide", "roll-target", "roll-long", "roll-silent"];
+export type StyledCue = { atMs: number; kind: "beat" | "tick" | "action" | "glide"; beat: number | null; durationMs?: number };
 
 export function getMetronomeCueFrequency(beat: number): number {
   return beat === METRONOME_BEAT_COUNT ? ACTION_CUE_HZ : METRONOME_CUE_HZ;
+}
+
+export function getCueFrequency(style: CueStyle, beat: number): number {
+  if (style !== "scale" || beat >= METRONOME_BEAT_COUNT) return getMetronomeCueFrequency(beat);
+  const ratio = ACTION_CUE_HZ / METRONOME_CUE_HZ;
+  return METRONOME_CUE_HZ * Math.pow(ratio, (beat - 1) / (METRONOME_BEAT_COUNT - 1));
 }
 
 export function getMetronomeSchedule(phaseStartMs: number, durationMs: number): number[] {
@@ -34,13 +41,17 @@ export function getMetronomeSchedule(phaseStartMs: number, durationMs: number): 
 
 export function getCueSchedule(phaseStartMs: number, durationMs: number, style: CueStyle): StyledCue[] {
   const phaseEnd = phaseStartMs + durationMs;
-  const audibleBeats = style === "roll-silent" ? METRONOME_BEAT_COUNT - 2 : METRONOME_BEAT_COUNT - 1;
+  const audibleBeats = style === "roll-silent" || style === "glide" ? METRONOME_BEAT_COUNT - 2 : METRONOME_BEAT_COUNT - 1;
   const cues: StyledCue[] = getMetronomeSchedule(phaseStartMs, durationMs)
     .slice(0, audibleBeats)
     .map((atMs, index) => ({ atMs, kind: "beat", beat: index + 1 }));
   const tickOffsets = style === "roll-target" ? DRUMROLL_TICK_OFFSETS_MS : style === "roll-long" ? DRUMROLL_LONG_TICK_OFFSETS_MS : [];
   for (const offsetMs of tickOffsets) {
     cues.push({ atMs: phaseEnd - offsetMs, kind: "tick", beat: null });
+  }
+  if (style === "glide") {
+    const glideStart = Math.max(phaseStartMs + 1, phaseEnd - GLIDE_DURATION_MS);
+    cues.push({ atMs: glideStart, kind: "glide", beat: null, durationMs: phaseEnd - glideStart });
   }
   cues.push({ atMs: phaseEnd, kind: "action", beat: METRONOME_BEAT_COUNT });
   return cues.sort((a, b) => a.atMs - b.atMs);

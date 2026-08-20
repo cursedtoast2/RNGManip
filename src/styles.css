@@ -167,6 +167,7 @@ svg { width: 18px; height: 18px; }
 .cue-style-selector button[aria-pressed="true"] { color: var(--text); border-color: var(--purple); background: var(--purple-dark); }
 @media (hover: hover) and (pointer: fine) { .cue-style-selector button:hover:not(:disabled):not([aria-pressed="true"]) { color: var(--text); border-color: var(--line-strong); background: var(--surface-2); } }
 .cue-style-selector button:disabled { opacity: .55; cursor: default; }
+.cue-style-hint { min-height: 32px; margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .sid-setup-timer { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .sid-timer-trigger { width: 100%; min-height: 54px; border: 0; padding: 9px 13px; display: flex; align-items: center; justify-content: space-between; gap: 14px; text-align: left; background: transparent; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .sid-timer-trigger:hover { background: var(--surface-2); } }
