@@ -38,6 +38,8 @@ import {
   type RseIdState,
 } from "../engine/rseSid";
 import { isRseGenderless } from "../engine/rseSpecies";
+import { recordAttempt } from "../engine/attemptHistory";
+import AttemptHistory from "../components/AttemptHistory";
 import { type CueStyle } from "../engine/timer";
 
 type Stage = "setup" | "target" | "attempt" | "result";
@@ -698,6 +700,12 @@ function AttemptPage({
 
   const handleApply = (hitAdvance: number, apply: boolean) => {
     onHitRecorded({ advanceDelta: target.advance - hitAdvance });
+    recordAttempt("rse", {
+      at: Date.now(),
+      label: `${encounter.species} · advance ${hitAdvance.toLocaleString()}`,
+      applied: apply,
+      presses: [{ key: "advance", label: "Target frame timer", lateMs: -rseCalibrationMs(target.advance, hitAdvance, target.consoleName), frameMs: consoleFramesToMs(1, target.consoleName) }],
+    });
     if (apply) setCalibrationMs(calibrationMs + rseCalibrationMs(target.advance, hitAdvance, target.consoleName));
     setAttempts((value) => value + 1);
     onResultConfirmed();
@@ -724,6 +732,7 @@ function AttemptPage({
           <span className="timing-controls-label">Calibration</span>
           <AdjustmentControl label="Target frame timer" unit="ms" step={100} value={calibrationMs} onChange={setCalibrationMs} />
         </div>
+        <div className="timer-history-row"><AttemptHistory tool="rse" /></div>
       </section>
       {recording && initialSeed !== null && <div className="result-workspace" hidden={view !== "result"}>
         <ResultEntry

@@ -14,12 +14,18 @@ export const DRUMROLL_LONG_TICK_OFFSETS_MS = [1750, 1250, 750, 250];
 export const PRESS_CLICK_HZ = 2400;
 export const PRESS_CLICK_DURATION_MS = 30;
 export const GLIDE_DURATION_MS = 1000;
+export const HEADS_UP_LEAD_MS = 5000;
+export const HEADS_UP_TICK_COUNT = 3;
+export const HEADS_UP_TICK_SPACING_MS = 130;
+export const HEADS_UP_TICK_HZ = 540;
+export const HEADS_UP_TICK_DURATION_MS = 70;
+export const HEADS_UP_MIN_PHASE_MS = HEADS_UP_LEAD_MS + 1500;
 
 export type PracticeJudgment = "early" | "target" | "late";
 export type PracticeOutcome = PracticeJudgment | "missed";
 export type CueStyle = "standard" | "scale" | "glide" | "roll-target" | "roll-long" | "roll-silent";
 export const CUE_STYLES: CueStyle[] = ["standard", "scale", "glide", "roll-target", "roll-long", "roll-silent"];
-export type StyledCue = { atMs: number; kind: "beat" | "tick" | "action" | "glide"; beat: number | null; durationMs?: number };
+export type StyledCue = { atMs: number; kind: "beat" | "tick" | "action" | "glide" | "alert"; beat: number | null; durationMs?: number };
 
 export function getMetronomeCueFrequency(beat: number): number {
   return beat === METRONOME_BEAT_COUNT ? ACTION_CUE_HZ : METRONOME_CUE_HZ;
@@ -40,7 +46,7 @@ export function getMetronomeSchedule(phaseStartMs: number, durationMs: number): 
     phaseEnd - METRONOME_MAX_INTERVAL_MS * (METRONOME_BEAT_COUNT - index - 1));
 }
 
-export function getCueSchedule(phaseStartMs: number, durationMs: number, style: CueStyle): StyledCue[] {
+export function getCueSchedule(phaseStartMs: number, durationMs: number, style: CueStyle, headsUp = false): StyledCue[] {
   const phaseEnd = phaseStartMs + durationMs;
   const audibleBeats = style === "roll-silent" || style === "glide" ? METRONOME_BEAT_COUNT - 2 : METRONOME_BEAT_COUNT - 1;
   const cues: StyledCue[] = getMetronomeSchedule(phaseStartMs, durationMs)
@@ -53,6 +59,11 @@ export function getCueSchedule(phaseStartMs: number, durationMs: number, style: 
   if (style === "glide") {
     const glideStart = Math.max(phaseStartMs + 1, phaseEnd - GLIDE_DURATION_MS);
     cues.push({ atMs: glideStart, kind: "glide", beat: null, durationMs: phaseEnd - glideStart });
+  }
+  if (headsUp && durationMs >= HEADS_UP_MIN_PHASE_MS) {
+    for (let tick = 0; tick < HEADS_UP_TICK_COUNT; tick += 1) {
+      cues.push({ atMs: phaseEnd - HEADS_UP_LEAD_MS + HEADS_UP_TICK_SPACING_MS * tick, kind: "alert", beat: null });
+    }
   }
   cues.push({ atMs: phaseEnd, kind: "action", beat: METRONOME_BEAT_COUNT });
   return cues.sort((a, b) => a.atMs - b.atMs);
@@ -98,6 +109,24 @@ export function findPracticeDeadlineIndex(pressedAt: number, deadlines: number[]
     }
   });
   return index;
+}
+
+export function shouldAdvancePracticePhase(pressIndex: number, currentPhase: number, pressedAt: number, deadlines: number[]): boolean {
+  if (pressIndex !== currentPhase) return false;
+  const deadline = deadlines[pressIndex];
+  return deadline !== undefined && pressedAt < deadline;
+}
+
+export function getPracticeAdvanceDeadlines(deadlines: number[], phaseDurations: number[], pressIndex: number, pressedAt: number): number[] {
+  const next = deadlines.slice();
+  if (pressIndex < 0 || pressIndex >= next.length) return next;
+  next[pressIndex] = pressedAt;
+  let deadline = pressedAt;
+  for (let index = pressIndex + 1; index < next.length; index += 1) {
+    deadline += phaseDurations[index] ?? 0;
+    next[index] = deadline;
+  }
+  return next;
 }
 
 export function getPracticeStreaks(judgments: PracticeOutcome[]): { current: number; best: number } {

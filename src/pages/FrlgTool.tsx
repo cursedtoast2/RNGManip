@@ -27,6 +27,8 @@ import {
   type GameVersion,
 } from "../engine/encounters";
 import { isGenderless } from "../engine/species";
+import { recordAttempt } from "../engine/attemptHistory";
+import AttemptHistory from "../components/AttemptHistory";
 import { loadSeedData } from "../engine/seedData";
 import { type CueStyle } from "../engine/timer";
 import {
@@ -878,14 +880,27 @@ function AttemptPage({
   const [practiceMode, setPracticeMode] = useState(false);
   const huntPhases = useMemo(() => encounterTimerPhases(target, encounter, calibration), [calibration, encounter, target]);
 
-  const handleApply = (hitSeedMs: number, hitContinueFrames: number, apply: boolean) => {
-    const openingDelta = target.seedMs - hitSeedMs;
-    const continueDelta = target.continueFrames - hitContinueFrames;
+  const pressLabels = isSwitchConsole(target.consoleName)
+    ? { opening: "Title timer", continue: "Load save timer" }
+    : { opening: "Pre-timer", continue: "Target frame timer" };
+
+  const handleApply = (hit: HitResult, apply: boolean) => {
+    const openingDelta = target.seedMs - hit.seedMs;
+    const continueDelta = target.continueFrames - hit.continueFrames;
     onHitRecorded({ openingDelta, continueDelta });
+    recordAttempt("frlg", {
+      at: Date.now(),
+      label: `${hit.nature} ${encounter.species} · seed ${hit.seed} · advance ${hit.advance.toLocaleString()}`,
+      applied: apply,
+      presses: [
+        { key: "opening", label: pressLabels.opening, lateMs: -openingDelta, frameMs: consoleFramesToMs(1, target.consoleName) },
+        { key: "continue", label: pressLabels.continue, lateMs: -eonAdvanceCalibrationMs(target.continueFrames, hit.continueFrames, target.consoleName), frameMs: consoleFramesToMs(1, target.consoleName) },
+      ],
+    });
     if (apply) {
       const nextCalibration = {
         seed: calibration.seed + openingDelta,
-        continueMs: calibration.continueMs + eonAdvanceCalibrationMs(target.continueFrames, hitContinueFrames, target.consoleName),
+        continueMs: calibration.continueMs + eonAdvanceCalibrationMs(target.continueFrames, hit.continueFrames, target.consoleName),
       };
       setCalibration(nextCalibration);
     }
@@ -916,6 +931,7 @@ function AttemptPage({
           <AdjustmentControl label={isSwitchConsole(target.consoleName) ? "Title timer" : "Pre-timer"} unit="ms" value={calibration.seed} onChange={(seed) => setCalibration({ ...calibration, seed })} />
           <AdjustmentControl label={isSwitchConsole(target.consoleName) ? "Load save timer" : "Target frame timer"} unit="ms" value={calibration.continueMs} onChange={(continueMs) => setCalibration({ ...calibration, continueMs })} />
         </div>
+        <div className="timer-history-row"><AttemptHistory tool="frlg" /></div>
       </section>
       {recording && <div className="result-workspace" hidden={view !== "result"}>
         <ResultEntry
@@ -936,7 +952,19 @@ function AttemptPage({
           active={view === "result"}
           focusRequest={resultFocusRequest}
           onApply={handleApply}
-          onSidRejected={() => { onHitRecorded({ openingDelta: 0, continueDelta: 0 }); onSidRejected(); }}
+          onSidRejected={() => {
+            onHitRecorded({ openingDelta: 0, continueDelta: 0 });
+            recordAttempt("frlg", {
+              at: Date.now(),
+              label: `${target.nature} ${encounter.species} · seed ${target.seed} · advance ${target.advance.toLocaleString()} · wrong Secret ID`,
+              applied: false,
+              presses: [
+                { key: "opening", label: pressLabels.opening, lateMs: 0, frameMs: consoleFramesToMs(1, target.consoleName) },
+                { key: "continue", label: pressLabels.continue, lateMs: 0, frameMs: consoleFramesToMs(1, target.consoleName) },
+              ],
+            });
+            onSidRejected();
+          }}
         />
       </div>}
       {view === "result" && !recording && <div className="tool-empty"><h1>No result yet</h1></div>}
@@ -1085,7 +1113,7 @@ export function ResultEntry({
   onObservedNatureChange?: (nature: string) => void;
   active?: boolean;
   focusRequest?: number;
-  onApply: (hitSeedMs: number, hitContinueFrames: number, apply: boolean) => void;
+  onApply: (hit: HitResult, apply: boolean) => void;
   onSidRejected: () => void;
 }) {
   const restoredDraft = useMemo(() => loadResultDraft(target, encounter, resultVersion), [encounter, resultVersion, target]);
@@ -1211,7 +1239,7 @@ export function ResultEntry({
       if (canRejectSid) onSidRejected();
       return;
     }
-    onApply(chosenMatch.seedMs, chosenMatch.continueFrames, applyCalibration);
+    onApply(chosenMatch, applyCalibration);
   };
   const confirmationLabel = exactTarget && hunt.sidMode === "new-save" ? "Try next Secret ID" : "Next attempt";
 

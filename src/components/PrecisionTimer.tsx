@@ -8,6 +8,8 @@ import {
   DRUMROLL_TICK_DURATION_MS,
   DRUMROLL_TICK_HZ,
   GLIDE_DURATION_MS,
+  HEADS_UP_TICK_DURATION_MS,
+  HEADS_UP_TICK_HZ,
   METRONOME_CUE_HZ,
   PRACTICE_HIT_CUE_DURATION_MS,
   PRACTICE_HIT_CUE_HZ,
@@ -19,10 +21,12 @@ import {
   getCueFrequency,
   getCueSchedule,
   getMedianTimingOffset,
+  getPracticeAdvanceDeadlines,
   getPracticeFrameOffset,
   getPracticeStreaks,
   getPracticeTailDurations,
   judgePracticePress,
+  shouldAdvancePracticePhase,
   type CueStyle,
   type PracticeJudgment,
   type PracticeOutcome,
@@ -72,7 +76,7 @@ export async function preparePrecisionAudio(state: PrecisionAudioState): Promise
   }
 }
 
-export function stopPrecisionAudio(state: PrecisionAudioState): void {
+export function cancelScheduledPrecisionCues(state: PrecisionAudioState): void {
   for (const oscillator of state.scheduledCues) {
     try {
       oscillator.stop();
@@ -81,6 +85,10 @@ export function stopPrecisionAudio(state: PrecisionAudioState): void {
     oscillator.disconnect();
   }
   state.scheduledCues.clear();
+}
+
+export function stopPrecisionAudio(state: PrecisionAudioState): void {
+  cancelScheduledPrecisionCues(state);
   state.keepAliveOscillator?.stop();
   state.keepAliveOscillator?.disconnect();
   state.keepAliveGain?.disconnect();
@@ -101,9 +109,9 @@ function schedulePrecisionCue(state: PrecisionAudioState, beat: number, when: nu
   const gain = context.createGain();
   oscillator.type = "sine";
   oscillator.frequency.value = actionCue ? ACTION_CUE_HZ : getCueFrequency(style, beat);
-  gain.gain.setValueAtTime(actionCue ? 0.17 : 0.11, when);
+  gain.gain.setValueAtTime(actionCue ? 0.34 : 0.22, when);
   if (actionCue) {
-    gain.gain.setValueAtTime(0.17, when + Math.max(0, durationSeconds - 0.008));
+    gain.gain.setValueAtTime(0.34, when + Math.max(0, durationSeconds - 0.008));
     gain.gain.exponentialRampToValueAtTime(0.001, when + durationSeconds);
   } else {
     gain.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
@@ -127,7 +135,7 @@ function scheduleDrumrollTick(state: PrecisionAudioState, when: number): void {
   const gain = context.createGain();
   oscillator.type = "sine";
   oscillator.frequency.value = DRUMROLL_TICK_HZ;
-  gain.gain.setValueAtTime(0.07, when);
+  gain.gain.setValueAtTime(0.14, when);
   gain.gain.exponentialRampToValueAtTime(0.001, when + durationSeconds);
   oscillator.connect(gain).connect(context.destination);
   state.scheduledCues.add(oscillator);
@@ -149,8 +157,8 @@ function scheduleGlideCue(state: PrecisionAudioState, when: number, durationSeco
   oscillator.type = "sine";
   oscillator.frequency.setValueAtTime(METRONOME_CUE_HZ, when);
   oscillator.frequency.exponentialRampToValueAtTime(ACTION_CUE_HZ, stoppedAt);
-  gain.gain.setValueAtTime(0.025, when);
-  gain.gain.exponentialRampToValueAtTime(0.1, stoppedAt - 0.012);
+  gain.gain.setValueAtTime(0.05, when);
+  gain.gain.exponentialRampToValueAtTime(0.2, stoppedAt - 0.012);
   gain.gain.exponentialRampToValueAtTime(0.001, stoppedAt);
   oscillator.connect(gain).connect(context.destination);
   state.scheduledCues.add(oscillator);
@@ -163,7 +171,28 @@ function scheduleGlideCue(state: PrecisionAudioState, when: number, durationSeco
   oscillator.stop(stoppedAt);
 }
 
-export function schedulePrecisionRun(state: PrecisionAudioState, phaseDurations: number[], absoluteStart: number, cueStyle: CueStyle): void {
+function scheduleHeadsUpTick(state: PrecisionAudioState, when: number): void {
+  const context = ensurePrecisionAudio(state);
+  if (!context || context.state !== "running") return;
+  const durationSeconds = HEADS_UP_TICK_DURATION_MS / 1000;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = "sine";
+  oscillator.frequency.value = HEADS_UP_TICK_HZ;
+  gain.gain.setValueAtTime(0.2, when);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + durationSeconds);
+  oscillator.connect(gain).connect(context.destination);
+  state.scheduledCues.add(oscillator);
+  oscillator.onended = () => {
+    state.scheduledCues.delete(oscillator);
+    oscillator.disconnect();
+    gain.disconnect();
+  };
+  oscillator.start(when);
+  oscillator.stop(when + durationSeconds);
+}
+
+export function schedulePrecisionRun(state: PrecisionAudioState, phaseDurations: number[], absoluteStart: number, cueStyle: CueStyle, headsUp = false): void {
   const context = ensurePrecisionAudio(state);
   if (!context || context.state !== "running") return;
   const performanceNow = performance.timeOrigin + performance.now();
@@ -171,10 +200,11 @@ export function schedulePrecisionRun(state: PrecisionAudioState, phaseDurations:
   let phaseStart = absoluteStart;
 
   for (const duration of phaseDurations) {
-    for (const cue of getCueSchedule(phaseStart, duration, cueStyle)) {
+    for (const cue of getCueSchedule(phaseStart, duration, cueStyle, headsUp)) {
       if (cue.atMs <= phaseStart || cue.atMs <= performanceNow) continue;
       const when = audioNow + (cue.atMs - performanceNow) / 1000;
       if (cue.kind === "tick") scheduleDrumrollTick(state, when);
+      else if (cue.kind === "alert") scheduleHeadsUpTick(state, when);
       else if (cue.kind === "glide") scheduleGlideCue(state, when, (cue.durationMs ?? GLIDE_DURATION_MS) / 1000);
       else schedulePrecisionCue(state, cue.beat!, when, cueStyle);
     }
@@ -191,7 +221,7 @@ function playPressClick(state: PrecisionAudioState): void {
   const gain = context.createGain();
   oscillator.type = "sine";
   oscillator.frequency.value = PRESS_CLICK_HZ;
-  gain.gain.setValueAtTime(0.2, startedAt);
+  gain.gain.setValueAtTime(0.35, startedAt);
   gain.gain.exponentialRampToValueAtTime(0.001, startedAt + durationSeconds);
   oscillator.connect(gain).connect(context.destination);
   oscillator.onended = () => {
@@ -219,8 +249,8 @@ function playPracticeHitCue(state: PrecisionAudioState, delaySeconds = 0): void 
     oscillator.type = "triangle";
     oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(0.001, noteStartedAt);
-    gain.gain.exponentialRampToValueAtTime(0.12, noteStartedAt + 0.012);
-    gain.gain.setValueAtTime(0.1, noteStoppedAt - 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.24, noteStartedAt + 0.012);
+    gain.gain.setValueAtTime(0.2, noteStoppedAt - 0.09);
     gain.gain.exponentialRampToValueAtTime(0.001, noteStoppedAt);
     oscillator.connect(gain).connect(context.destination);
     oscillator.onended = () => {
@@ -457,6 +487,41 @@ function useTapAnywhere(): boolean {
   return useSyncExternalStore(subscribeTapAnywhere, getTapAnywhere, () => false);
 }
 
+const HEADS_UP_STORAGE_KEY = "rngmanip-heads-up-v1";
+
+let headsUpValue: boolean | null = null;
+const headsUpListeners = new Set<() => void>();
+
+function getHeadsUp(): boolean {
+  if (headsUpValue === null) {
+    try {
+      headsUpValue = window.localStorage.getItem(HEADS_UP_STORAGE_KEY) === "on";
+    } catch {
+      headsUpValue = false;
+    }
+  }
+  return headsUpValue;
+}
+
+function setHeadsUp(value: boolean): void {
+  if (getHeadsUp() === value) return;
+  headsUpValue = value;
+  try {
+    window.localStorage.setItem(HEADS_UP_STORAGE_KEY, value ? "on" : "off");
+  } catch {
+  }
+  for (const listener of headsUpListeners) listener();
+}
+
+function subscribeHeadsUp(listener: () => void): () => void {
+  headsUpListeners.add(listener);
+  return () => { headsUpListeners.delete(listener); };
+}
+
+function useHeadsUp(): boolean {
+  return useSyncExternalStore(subscribeHeadsUp, getHeadsUp, () => false);
+}
+
 function isTimerControl(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest("button, input, select, textarea, a, [data-timer-control]") !== null;
 }
@@ -494,6 +559,7 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
   const [practiceOutcomes, setPracticeOutcomes] = useState<PracticeOutcome[]>([]);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const tapAnywhere = useTapAnywhere();
+  const headsUp = useHeadsUp();
   const timerWorker = useRef<Worker | null>(null);
   const timerSurface = useRef<HTMLDivElement | null>(null);
   const options = useRef<HTMLDivElement | null>(null);
@@ -510,6 +576,8 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
   const wakeLock = useRef<ScreenWakeLock>(createScreenWakeLock());
   const activePhases = useRef<number[]>(runPhases);
   const practiceModeRef = useRef(practiceRun);
+  const phaseOffset = useRef(0);
+  const phaseIndexRef = useRef(0);
 
   useEffect(() => { practiceModeRef.current = practiceRun; }, [practiceRun]);
   useEffect(() => { onStartedRef.current = onStarted; }, [onStarted]);
@@ -544,6 +612,28 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     };
   }, [optionsOpen]);
 
+  const finishPracticeRun = useCallback((delayMs: number) => {
+    if (finishTimeout.current !== null) window.clearTimeout(finishTimeout.current);
+    setRemaining(0);
+    finishTimeout.current = window.setTimeout(() => {
+      finishTimeout.current = null;
+      if (!runningRef.current) return;
+      runningRef.current = false;
+      timerWorker.current?.postMessage({ type: "stop" });
+      stopPrecisionAudio(audioState);
+      releaseScreenWakeLock(wakeLock.current);
+      practiceRestartAllowedAt.current = performance.timeOrigin + performance.now() + PRACTICE_RESTART_GUARD_MS;
+      const results = practicePresses.current.slice();
+      setPracticeSummary(results);
+      setPracticeOutcomes((outcomes) => [...outcomes, ...results.map((entry): PracticeOutcome => entry?.judgment ?? "missed")]);
+      if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
+      practiceFlashTimeout.current = null;
+      setPracticeFlash(null);
+      setRunning(false);
+      setBeepStep(6);
+    }, delayMs);
+  }, [audioState]);
+
   useEffect(() => {
     if (typeof Worker === "undefined") return;
     const worker = new Worker(new URL("../engine/timerWorker.ts", import.meta.url), { type: "module" });
@@ -555,28 +645,14 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
       } else if (event.data.type === "tick" && event.data.remaining !== undefined) {
         setRemaining(event.data.remaining);
       } else if (event.data.type === "phase" && event.data.phase !== undefined) {
-        setPhaseIndex(event.data.phase);
-        setRemaining(activePhases.current[event.data.phase] ?? 0);
+        const phase = phaseOffset.current + event.data.phase;
+        phaseIndexRef.current = phase;
+        setPhaseIndex(phase);
+        setRemaining(activePhases.current[phase] ?? 0);
         setBeepStep(0);
       } else if (event.data.type === "finished") {
         if (practiceModeRef.current) {
-          setRemaining(0);
-          finishTimeout.current = window.setTimeout(() => {
-            finishTimeout.current = null;
-            if (!runningRef.current) return;
-            runningRef.current = false;
-            stopPrecisionAudio(audioState);
-            releaseScreenWakeLock(wakeLock.current);
-            practiceRestartAllowedAt.current = performance.timeOrigin + performance.now() + PRACTICE_RESTART_GUARD_MS;
-            const results = practicePresses.current.slice();
-            setPracticeSummary(results);
-            setPracticeOutcomes((outcomes) => [...outcomes, ...results.map((entry): PracticeOutcome => entry?.judgment ?? "missed")]);
-            if (practiceFlashTimeout.current !== null) window.clearTimeout(practiceFlashTimeout.current);
-            practiceFlashTimeout.current = null;
-            setPracticeFlash(null);
-            setRunning(false);
-            setBeepStep(6);
-          }, 1000);
+          finishPracticeRun(1000);
         } else {
           runningRef.current = false;
           setRunning(false);
@@ -599,7 +675,7 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
       releaseScreenWakeLock(wakeLock.current);
       timerWorker.current = null;
     };
-  }, [audioState]);
+  }, [audioState, finishPracticeRun]);
 
   const stop = useCallback(() => {
     commandToken.current += 1;
@@ -617,6 +693,8 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     setBeepStep(0);
     setPracticeFlash(null);
     setPracticeSummary(null);
+    phaseOffset.current = 0;
+    phaseIndexRef.current = 0;
     phaseDeadlines.current = [];
     practicePresses.current = [];
     practiceRestartAllowedAt.current = 0;
@@ -629,6 +707,8 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     runningRef.current = true;
     onStartedRef.current?.();
     activePhases.current = runPhases;
+    phaseOffset.current = 0;
+    phaseIndexRef.current = 0;
     setPhaseIndex(0);
     setRemaining(phases[0]);
     setBeepStep(0);
@@ -652,17 +732,37 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
       deadline += duration;
       return deadline;
     });
-    schedulePrecisionRun(audioState, runPhases, absoluteStart, cueStyle);
+    schedulePrecisionRun(audioState, runPhases, absoluteStart, cueStyle, !practiceRun && headsUp);
     timerWorker.current?.postMessage({
       type: "start",
       phaseDurations: runPhases,
       absoluteStart,
     });
-  }, [audioState, cueStyle, phases, practiceMode, runPhases]);
+  }, [audioState, cueStyle, headsUp, phases, practiceRun, runPhases]);
+
+  const advancePracticePhase = useCallback((pressIndex: number, pressedAt: number) => {
+    phaseDeadlines.current = getPracticeAdvanceDeadlines(phaseDeadlines.current, activePhases.current, pressIndex, pressedAt);
+    cancelScheduledPrecisionCues(audioState);
+    timerWorker.current?.postMessage({ type: "stop" });
+    const nextIndex = pressIndex + 1;
+    if (nextIndex >= activePhases.current.length) {
+      finishPracticeRun(PRACTICE_FLASH_MS);
+      return;
+    }
+    const remainingPhases = activePhases.current.slice(nextIndex);
+    phaseOffset.current = nextIndex;
+    phaseIndexRef.current = nextIndex;
+    setPhaseIndex(nextIndex);
+    setRemaining(remainingPhases[0]);
+    setBeepStep(0);
+    schedulePrecisionRun(audioState, remainingPhases, pressedAt, cueStyle);
+    timerWorker.current?.postMessage({ type: "start", phaseDurations: remainingPhases, absoluteStart: pressedAt });
+  }, [audioState, cueStyle, finishPracticeRun]);
 
   const recordPracticePress = useCallback((pressedAt: number) => {
     const deadlines = phaseDeadlines.current;
-    const index = findPracticeDeadlineIndex(pressedAt, deadlines);
+    let index = findPracticeDeadlineIndex(pressedAt, deadlines);
+    if (index >= 0 && index !== phaseIndexRef.current && practicePresses.current[index]) index = phaseIndexRef.current;
     if (index < 0) return;
 
     playPressClick(audioState);
@@ -683,7 +783,8 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
       practiceFlashTimeout.current = null;
       setPracticeFlash(null);
     }, PRACTICE_FLASH_MS);
-  }, [audioState, targetFrameMs]);
+    if (shouldAdvancePracticePhase(index, phaseIndexRef.current, pressedAt, deadlines)) advancePracticePhase(index, pressedAt);
+  }, [advancePracticePhase, audioState, targetFrameMs]);
 
   const startFromInput = useCallback((pressedAt = performance.timeOrigin + performance.now()) => {
     if (practiceRun && pressedAt < practiceRestartAllowedAt.current) return;
@@ -787,6 +888,14 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
           {optionsOpen && <div className="timer-options-popover" role="dialog" aria-label="Timer options">
             <span className="timer-options-label">Cue style</span>
             <CueStyleSelector value={cueStyle} label="Timer cue style" onChange={onCueStyleChange} />
+            {showHuntCueStyle && <>
+              <span className="timer-options-label headsup-label">Heads-up ticks</span>
+              <div className="cue-style-selector headsup-toggle" role="group" aria-label="Heads-up ticks">
+                <button type="button" aria-pressed={!headsUp} onClick={() => setHeadsUp(false)}>Off</button>
+                <button type="button" aria-pressed={headsUp} onClick={() => setHeadsUp(true)}>On</button>
+              </div>
+              <p className="cue-style-hint">Three quick ticks five seconds before the press cues on the hunt timer.</p>
+            </>}
           </div>}
         </div>}
       </div>
