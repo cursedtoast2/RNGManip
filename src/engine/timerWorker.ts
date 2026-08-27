@@ -1,7 +1,5 @@
 /// <reference lib="webworker" />
 
-import { getMetronomeSchedule } from "./timer";
-
 const workerScope = self as unknown as DedicatedWorkerGlobalScope;
 const SPIN_WAIT_MS = 4;
 const REFRESH_INTERVAL_MS = 8;
@@ -37,28 +35,13 @@ async function run(phaseDurations: number[], absoluteStart: number, token: numbe
   for (let phase = 0; phase < phaseDurations.length && running && token === runToken; phase += 1) {
     const duration = phaseDurations[phase];
     const phaseEnd = phaseStart + duration;
-    const beats = getMetronomeSchedule(phaseStart, duration);
-    let beatIndex = 0;
-    const phaseEnteredAt = now();
-    while (beatIndex < beats.length && beats[beatIndex] <= phaseEnteredAt) beatIndex += 1;
     let nextUiUpdate = now();
 
     while (running && token === runToken && now() < phaseEnd) {
-      const nextBeat = beats[beatIndex] ?? Infinity;
-      await waitUntil(Math.min(nextBeat, nextUiUpdate, phaseEnd), token);
+      await waitUntil(Math.min(nextUiUpdate, phaseEnd), token);
       if (!running || token !== runToken) return;
 
       const timestamp = now();
-      while (beatIndex < beats.length && timestamp >= beats[beatIndex]) {
-        workerScope.postMessage({
-          type: "beat",
-          beat: beatIndex + 1,
-          phase,
-          deadline: beats[beatIndex],
-          postedAt: timestamp,
-        });
-        beatIndex += 1;
-      }
       if (timestamp >= nextUiUpdate) {
         workerScope.postMessage({ type: "tick", remaining: Math.max(0, phaseEnd - timestamp) });
         nextUiUpdate = timestamp + REFRESH_INTERVAL_MS;

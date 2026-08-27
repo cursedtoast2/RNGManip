@@ -189,8 +189,6 @@ svg { width: 18px; height: 18px; }
 .sid-timer-timer .timer-toolbar { width: 100%; position: relative; top: auto; left: auto; transform: none; }
 .sid-timer-timer .practice-support { width: 100%; position: relative; bottom: auto; left: auto; transform: none; }
 .sid-timer-timer .timer-numbers { font-size: clamp(36px, 4vw, 52px); }
-.sid-timer-timer .timer-beats { min-height: 88px; margin-top: 16px; }
-.sid-timer-timer .timer-beats span { width: 64px; height: 64px; }
 .sid-timer-timer .guided-timer .input-legend { margin-top: 0; }
 
 .history-trigger { min-height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; display: flex; align-items: center; gap: 7px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 650; cursor: pointer; }
@@ -316,12 +314,6 @@ svg { width: 18px; height: 18px; }
 .practice-summary li.practice-late b { color: var(--red); }
 .practice-summary li.practice-target b { color: var(--green); }
 .practice-summary li.practice-missed b { color: var(--red); }
-.timer-beats { min-height: 112px; margin-top: 30px; display: flex; align-items: center; justify-content: center; gap: 18px; }
-.timer-beats span { width: 76px; height: 76px; display: grid; place-items: center; border: 3px solid var(--line-strong); border-radius: 50%; color: var(--muted); font-size: 20px; font-weight: 750; }
-.timer-beats span.heard { color: #211d29; background: var(--purple); border-color: var(--purple); }
-.timer-beats span.action-beat { color: var(--orange); border-color: var(--orange); }
-.timer-beats span.action-beat.heard { color: #2b2117; background: var(--orange); border-color: var(--orange); }
-.timer-beats span.action-beat { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .timer-surface-hint { margin-top: 18px; color: var(--subtle); font-size: 11px; font-weight: 600; }
 .input-legend { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
 .input-legend-chip { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 5px; color: var(--subtle); background: var(--surface); font-size: 11px; font-weight: 650; line-height: 1.5; white-space: nowrap; }
@@ -451,9 +443,7 @@ svg { width: 18px; height: 18px; }
   .target-tools { min-height: 54px; }
   .target-search-controls { grid-template-columns: repeat(5, 150px); overflow-x: auto; }
   .timer-numbers { font-size: 40px; }
-  .timer-beats { min-height: 90px; margin-top: 22px; gap: 8px; }
   .practice-summary { min-height: 90px; margin-top: 22px; }
-  .timer-beats span { width: 58px; height: 58px; font-size: 17px; }
   .timing-controls { overflow-x: auto; justify-content: start; }
   .result-observations { overflow-x: auto; max-width: 100%; }
   .result-observation-row { grid-template-columns: 64px 350px max-content; }
@@ -553,9 +543,7 @@ svg { width: 18px; height: 18px; }
   .guided-timer { gap: 8px; padding: 8px 0; }
   .timer-phase { margin-bottom: 6px; }
   .timer-numbers { font-size: clamp(30px, 7vh, 44px); }
-  .timer-beats { min-height: 60px; margin-top: 12px; }
   .practice-summary { min-height: 60px; margin-top: 12px; font-size: 12px; }
-  .timer-beats span { width: 50px; height: 50px; font-size: 15px; }
   .setup-page { padding-top: 22px; padding-bottom: 28px; }
 }
 

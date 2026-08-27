@@ -1,6 +1,5 @@
 import { ChevronDown, Gamepad2, Settings2, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { flushSync } from "react-dom";
 import {
   ACTION_CUE_DURATION_MS,
   ACTION_CUE_HZ,
@@ -552,7 +551,6 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
   const [running, setRunning] = useState(false);
   const [remaining, setRemaining] = useState(phases[0]);
   const [phaseIndex, setPhaseIndex] = useState(0);
-  const [beepStep, setBeepStep] = useState(0);
   const [practiceFlash, setPracticeFlash] = useState<PracticeFeedback | null>(null);
   const [practiceSummary, setPracticeSummary] = useState<(PracticeFeedback | null)[] | null>(null);
   const [practiceHistory, setPracticeHistory] = useState<PracticeFeedback[]>([]);
@@ -630,7 +628,6 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
       practiceFlashTimeout.current = null;
       setPracticeFlash(null);
       setRunning(false);
-      setBeepStep(6);
     }, delayMs);
   }, [audioState]);
 
@@ -638,18 +635,15 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     if (typeof Worker === "undefined") return;
     const worker = new Worker(new URL("../engine/timerWorker.ts", import.meta.url), { type: "module" });
     timerWorker.current = worker;
-    worker.onmessage = (event: MessageEvent<{ type: string; phase?: number; beat?: number; remaining?: number }>) => {
+    worker.onmessage = (event: MessageEvent<{ type: string; phase?: number; remaining?: number }>) => {
       if (!runningRef.current) return;
-      if (event.data.type === "beat" && event.data.beat !== undefined) {
-        flushSync(() => setBeepStep(event.data.beat!));
-      } else if (event.data.type === "tick" && event.data.remaining !== undefined) {
+      if (event.data.type === "tick" && event.data.remaining !== undefined) {
         setRemaining(event.data.remaining);
       } else if (event.data.type === "phase" && event.data.phase !== undefined) {
         const phase = phaseOffset.current + event.data.phase;
         phaseIndexRef.current = phase;
         setPhaseIndex(phase);
         setRemaining(activePhases.current[phase] ?? 0);
-        setBeepStep(0);
       } else if (event.data.type === "finished") {
         if (practiceModeRef.current) {
           finishPracticeRun(1000);
@@ -690,7 +684,6 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     setRunning(false);
     setPhaseIndex(0);
     setRemaining(phases[0]);
-    setBeepStep(0);
     setPracticeFlash(null);
     setPracticeSummary(null);
     phaseOffset.current = 0;
@@ -711,7 +704,6 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     phaseIndexRef.current = 0;
     setPhaseIndex(0);
     setRemaining(phases[0]);
-    setBeepStep(0);
     setPracticeFlash(null);
     setPracticeSummary(null);
     phaseDeadlines.current = [];
@@ -754,7 +746,6 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
     phaseIndexRef.current = nextIndex;
     setPhaseIndex(nextIndex);
     setRemaining(remainingPhases[0]);
-    setBeepStep(0);
     schedulePrecisionRun(audioState, remainingPhases, pressedAt, cueStyle);
     timerWorker.current?.postMessage({ type: "start", phaseDurations: remainingPhases, absoluteStart: pressedAt });
   }, [audioState, cueStyle, finishPracticeRun]);
@@ -909,7 +900,7 @@ export function GuidedTimer({ huntPhases, targetFrameMs, active, focusRequest, p
               <b>{entry ? formatPracticeFrames(entry.deltaMs, targetFrameMs) : "No press"}</b>
             </li>)}
           </ul>
-          : <div className="timer-beats" aria-label="Action timer beat"><span className={`${beepStep >= 6 ? "heard" : ""} action-beat`}>Press</span></div>}
+          : null}
       </div>
       <div className="timer-surface-hint">{surfaceHint}</div>
       {practiceRun && <PracticeSupport history={practiceHistory} outcomes={practiceOutcomes} targetFrameMs={targetFrameMs} />}
