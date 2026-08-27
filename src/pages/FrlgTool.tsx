@@ -462,7 +462,7 @@ function SidSetupTimer({ cueStyle, onCueStyleChange, audioState, active, duratio
   return (
     <div className="sid-setup-timer">
       <button ref={trigger} type="button" className="sid-timer-trigger" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
-        <span><b>1,500-advance setup timer</b><small>Start it on the OK press at the name entry screen. When it ends, press A on “Your very own POKéMON legend is about to unfold!”</small></span>
+        <span><b>1,500-advance setup timer</b><small>Start it the moment you press OK to confirm the name, then mash A through the rest of Oak’s speech. Stop on “Your very own POKéMON legend is about to unfold!” and wait there — press A the instant the timer ends. That press locks in your Secret ID window.</small></span>
         <ChevronDown aria-hidden="true" />
       </button>
       {open && createPortal(
