@@ -579,7 +579,7 @@ function SetupPage({ hunt, setHunt, trainerIdValid, cueStyle, onCueStyleChange, 
                   <div className="setup-row-label">Trainer ID</div>
                   <div className="setup-row-control">
                     <input className="setup-trainer-id-input" aria-label="Trainer ID" inputMode="numeric" maxLength={5} value={hunt.trainerId} onChange={(event) => update("trainerId", event.target.value.replace(/\D/g, ""))} aria-invalid={Boolean(trainerIdError)} aria-describedby="setup-trainer-id-note" />
-                    <p className="setup-field-note" id="setup-trainer-id-note">The five-digit ID on your Trainer Card, in the Pokédex menu.</p>
+                    <p className="setup-field-note" id="setup-trainer-id-note">The five-digit ID on your Trainer Card.</p>
                     {trainerIdError && <p className="setup-field-error" role="alert">{trainerIdError}</p>}
                   </div>
                 </div>
