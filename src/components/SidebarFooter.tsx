@@ -3,6 +3,7 @@ const CREDITS = [
   { label: "Ten Lines", href: "https://github.com/Lincoln-LM/ten-lines" },
   { label: "PokéFinder", href: "https://github.com/Admiral-Fish/PokeFinder" },
   { label: "Blisy", href: "https://www.youtube.com/c/imablisy" },
+  { label: "Papa Jefe", href: "https://www.youtube.com/@PapaJefeYT" },
 ] as const;
 
 export default function SidebarFooter() {
